@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LM Mathematics — Personal System</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg: #0a0a0a;
+    --panel: #111111;
+    --line: #2a2a24;
+    --text: #d8d8ce;
+    --dim: #6f6f64;
+    --amber: #d99a2b;
+    --amber-bright: #ffb703;
+    --danger: #b3492f;
+    --ok: #7fae6a;
+  }
+  *{ box-sizing:border-box; }
+  html, body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background-color:var(--bg); color:var(--text);
+    background-image:linear-gradient(rgba(201,162,39,.022) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(201,162,39,.022) 1px,transparent 1px);
+    background-size:34px 34px;
+    font-family: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+    font-size:14px;
+  }
+  ::selection{ background:var(--amber); color:#000; }
+  a{ cursor:pointer; }
+
+  /* ============ PAGE STACK ============ */
+  .page{
+    position:fixed; inset:0;
+    background-color:var(--bg);
+    background-image:linear-gradient(rgba(201,162,39,.022) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(201,162,39,.022) 1px,transparent 1px);
+    background-size:34px 34px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:60px 8vw;
+    z-index:1; visibility:hidden;
+  }
+  .page.visible{ visibility:visible; }
+  .page.enter{ animation: slideUp .65s cubic-bezier(.16,.84,.44,1) both; }
+  @keyframes slideUp{
+    from{ transform:translateY(6%); opacity:0; }
+    to{ transform:translateY(0); opacity:1; }
+  }
+
+  .id-line{
+    position:absolute; top:28px; right:32px;
+    font-size:10.5px; color:var(--dim); letter-spacing:1px;
+  }
+  .id-line a{ color:var(--dim); text-decoration:underline; text-underline-offset:2px; }
+  .id-line a:hover{ color:var(--amber-bright); }
+
+  .legal{
+    position:absolute; bottom:0; left:0; right:0;
+    padding:14px 32px; display:flex; justify-content:space-between; align-items:center;
+    font-size:10.5px; color:var(--dim);
+    border-top:1px solid var(--line);
+    background:var(--bg);
+  }
+  .legal-brand{ display:flex; align-items:center; gap:8px; }
+  .legal-crest{ width:20px; height:20px; flex-shrink:0; }
+  .legal-word{ font-size:12px; letter-spacing:0; color:var(--amber); }
+  .legal a{ color:var(--dim); text-decoration:underline; text-underline-offset:2px; }
+  .legal a:hover{ color:var(--amber-bright); }
+
+  .steps{ display:flex; gap:6px; margin-bottom:26px; justify-content:center; }
+  .steps span{ width:26px; height:2px; background:var(--line); }
+  .steps span.done{ background:var(--amber); }
+  .steps span.now{ background:var(--amber-bright); }
+
+  .back-link{ font-size:11px; color:var(--dim); margin-top:16px; display:inline-block; }
+  .back-link:hover{ color:var(--amber-bright); }
+
+  /* ---- welcome page ---- */
+  .hero{ text-align:center; max-width:640px; }
+  .hero-eyebrow{ font-size:11px; letter-spacing:4px; color:var(--dim); margin-bottom:18px; }
+  .hero-title{
+    font-size:clamp(34px, 6vw, 60px); line-height:1.05; letter-spacing:1px;
+    background: linear-gradient(135deg, #ffd98a 0%, #d99a2b 45%, #8a5e14 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-bottom:22px;
+  }
+  .hero-tag{ font-size:12px; letter-spacing:3px; color:var(--dim); margin-bottom:30px; }
+  .hero-body{ font-size:13.5px; color:var(--dim); line-height:1.85; margin-bottom:14px; text-align:left; }
+  .hero-body strong{ color:var(--text); font-weight:normal; }
+  .hero-body + .hero-body{ margin-bottom:34px; }
+
+  /* ---- shared box (steps 2-3) ---- */
+  .box{ width:420px; max-width:90vw; }
+  .box-title{ color:var(--dim); font-size:12px; letter-spacing:2px; margin-bottom:10px; }
+  .box-intro{ font-size:12px; color:var(--dim); line-height:1.7; margin-bottom:22px; }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:10px; letter-spacing:1.5px; color:var(--dim); margin-bottom:6px; }
+  .field .hint{ font-size:10px; color:#4a4a42; margin-top:5px; }
+  .prompt-line{ display:flex; align-items:center; gap:8px; }
+  .prompt-line .caret{ color:var(--amber); flex-shrink:0; }
+  .prompt-line .prefix{ color:var(--amber-bright); }
+  .prompt-line input{
+    flex:1; background:transparent; border:none; outline:none;
+    color:var(--amber-bright); font-family:inherit; font-size:14px;
+    border-bottom:1px solid var(--line); padding:4px 2px;
+  }
+  .prompt-line input::placeholder{ color:#4a4a42; }
+  .prompt-line input:focus{ border-bottom-color:var(--amber); }
+
+  .go-btn{
+    padding:11px 28px; background:transparent;
+    border:1px solid var(--amber); color:var(--amber-bright);
+    font-family:inherit; font-size:12px; letter-spacing:1px; cursor:pointer;
+  }
+  .go-btn.full{ width:100%; }
+  .go-btn:hover:not(:disabled){ background:var(--amber); color:#000; }
+  .go-btn:disabled{ border-color:var(--line); color:var(--dim); cursor:not-allowed; }
+
+  .foot-msg{ font-size:11px; color:var(--dim); margin-top:14px; min-height:14px; }
+  .foot-msg.err{ color:var(--danger); }
+  .foot-msg.ok{ color:var(--ok); }
+  .warn-note{
+    font-size:11px; color:var(--dim); line-height:1.6; margin-top:18px;
+    padding:10px 12px; border-left:2px solid var(--line);
+  }
+  .disclaimer{ font-size:10.5px; color:var(--dim); line-height:1.6; margin-top:16px; font-style:italic; }
+
+  /* ============ DASHBOARD ============ */
+  .dashboard{ align-items:stretch; justify-content:flex-start; padding:0; }
+  .dash-top{ display:flex; align-items:center; gap:14px; padding:16px 28px; border-bottom:1px solid var(--line);
+    background-image:linear-gradient(rgba(201,162,39,.03) 1px,transparent 1px), linear-gradient(90deg,rgba(201,162,39,.03) 1px,transparent 1px);
+    background-size:28px 28px; }
+  .dash-mark{ display:flex; align-items:center; gap:8px; }
+  .dash-crest{ width:22px; height:22px; }
+  .dash-word{ font-size:13px; letter-spacing:1px; color:var(--amber); }
+  .dash-sep{ width:1px; height:18px; background:var(--line); margin:0 6px; }
+  .dash-user{ font-size:11.5px; color:var(--dim); }
+  .dash-signout:hover{ color:var(--danger); }
+
+  .dash-tabs{
+    display:flex!important; flex-wrap:nowrap!important; overflow-x:auto!important; overflow-y:hidden!important;
+    white-space:nowrap; width:100%; max-width:100%; -webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--line);
+    scrollbar-width:thin; scrollbar-color:rgba(201,162,39,.55) transparent;
+  }
+  .dash-tabs::-webkit-scrollbar{ height:6px; }
+  .dash-tabs::-webkit-scrollbar-track{ background:transparent; }
+  .dash-tabs::-webkit-scrollbar-thumb{ background:rgba(201,162,39,.55); border-radius:3px; }
+  .dash-tabs .tab{
+    flex:0 0 auto; white-space:nowrap;
+    background:transparent; border:none; border-right:1px solid var(--line);
+    padding:12px 20px; font-size:11.5px; letter-spacing:1px; color:var(--dim); cursor:pointer;
+  }
+  .dash-tabs .tab:hover{ color:var(--text); }
+  .dash-tabs .tab.active{ color:var(--amber-bright); background:var(--panel); }
+
+  .dash-body{
+    flex:1; overflow:hidden; position:relative;
+    background-image:linear-gradient(rgba(201,162,39,.022) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(201,162,39,.022) 1px,transparent 1px);
+    background-size:34px 34px;
+  }
+  .tab-panel{ display:none; position:absolute; inset:0; overflow-y:auto; padding:30px 32px 60px; }
+  .tab-panel.active{ display:block; }
+
+  .sec-title{ font-size:11px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; margin:30px 0 14px; }
+  .sec-title:first-child{ margin-top:0; }
+  .sec-note{ font-size:11.5px; color:var(--dim); line-height:1.7; margin-bottom:18px; max-width:640px; }
+
+  /* ---- VAULT-style bordered panels ---- */
+  .panel{ border:1px solid var(--line); background:var(--panel); margin-bottom:20px; max-width:760px; }
+  .panel.panel-wide{ max-width:960px; }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px; border-bottom:1px solid var(--line); background:rgba(255,255,255,0.015);
+  }
+  .panel-title{ font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+  .panel-title::before{ content:'[ '; color:#4a4a42; }
+  .panel-title::after{ content:' ]'; color:#4a4a42; }
+  .panel-body{ padding:18px; }
+
+  /* ---- stat cards ---- */
+  .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); max-width:760px; }
+  .stat-card{ background:var(--panel); padding:14px 16px; }
+  .stat-num{ font-size:22px; color:var(--amber-bright); line-height:1; font-family:inherit; }
+  .stat-label{ font-size:10px; letter-spacing:1.5px; color:var(--dim); margin-top:8px; text-transform:uppercase; }
+
+  .callout{ border-left:2px solid var(--amber); padding:12px 16px; font-size:12px; color:var(--text); line-height:1.7; background:rgba(217,154,43,0.05); max-width:760px; }
+  .callout .callout-tag{ display:block; font-size:9.5px; letter-spacing:1.5px; color:var(--amber); margin-bottom:6px; }
+
+  /* ---- upload ---- */
+  .dropzone{ border:1px dashed var(--line); padding:34px; text-align:center; cursor:pointer; color:var(--dim); font-size:12px; letter-spacing:0.5px; transition:border-color .2s, color .2s; }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--amber); color:var(--amber-bright); }
+  .cat-choice{ display:flex; gap:8px; margin:16px 0 22px; flex-wrap:wrap; }
+  .cat-btn{ padding:7px 14px; border:1px solid var(--line); color:var(--dim); font-size:10.5px; letter-spacing:1px; cursor:pointer; background:transparent; font-family:inherit; }
+  .cat-btn.active{ border-color:var(--amber); color:var(--amber-bright); }
+  .file-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .file-tag{ font-size:9px; letter-spacing:1px; color:var(--amber); border:1px solid var(--line); padding:2px 7px; flex-shrink:0; }
+  .file-name{ flex:1; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-date{ font-size:10px; color:var(--dim); flex-shrink:0; }
+  .file-remove{ color:var(--dim); cursor:pointer; font-size:11px; flex-shrink:0; }
+  .file-remove:hover{ color:var(--danger); }
+  .empty-note{ color:var(--dim); font-size:12px; font-style:italic; padding:14px 0; }
+
+  /* ---- quiz ---- */
+  .quiz-card{ border:1px solid var(--line); padding:26px; max-width:560px; }
+  .quiz-progress{ font-size:10px; letter-spacing:1.5px; color:var(--dim); margin-bottom:18px; }
+  .quiz-q{ font-size:14px; color:var(--text); margin-bottom:22px; line-height:1.65; }
+  .quiz-opt{ display:block; width:100%; text-align:left; padding:11px 14px; margin-bottom:9px; border:1px solid var(--line); background:transparent; color:var(--text); font-family:inherit; font-size:12.5px; cursor:pointer; }
+  .quiz-opt:hover:not(:disabled){ border-color:var(--amber); }
+  .quiz-opt.correct{ border-color:var(--ok); color:var(--ok); }
+  .quiz-opt.wrong{ border-color:var(--danger); color:var(--danger); }
+  .quiz-opt:disabled{ cursor:default; }
+  .quiz-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:18px; }
+  .quiz-summary{ text-align:center; padding:20px 0; }
+  .quiz-summary .qs-num{ font-size:34px; color:var(--amber-bright); }
+
+  /* ---- similar questions ---- */
+  .sim-search{ display:flex; gap:10px; margin-bottom:22px; max-width:640px; }
+  .sim-search input{ flex:1; background:transparent; border:none; outline:none; color:var(--amber-bright); font-family:inherit; font-size:13px; border-bottom:1px solid var(--line); padding:6px 2px; }
+  .sim-search input:focus{ border-bottom-color:var(--amber); }
+  .sim-result{ border:1px solid var(--line); padding:14px 16px; margin-bottom:10px; max-width:640px; }
+  .sim-result .sim-top{ display:flex; justify-content:space-between; font-size:10px; letter-spacing:1px; color:var(--amber); margin-bottom:8px; }
+  .sim-result .sim-text{ font-size:12.5px; color:var(--text); line-height:1.6; }
+
+  /* ---- solving patterns ---- */
+  .pattern-split{ display:flex; gap:24px; flex-wrap:wrap; }
+  .pattern-list{ width:220px; flex-shrink:0; }
+  .pattern-item{ padding:11px 13px; border:1px solid var(--line); margin-bottom:8px; cursor:pointer; font-size:12px; color:var(--dim); }
+  .pattern-item.active{ border-color:var(--amber); color:var(--amber-bright); }
+  .pattern-detail{ flex:1; min-width:280px; border:1px solid var(--line); padding:22px; }
+  .pattern-detail .pd-title{ color:var(--amber-bright); font-size:13px; letter-spacing:1px; margin-bottom:16px; }
+  .pd-step{ font-size:12px; color:var(--text); margin-bottom:10px; padding-left:22px; position:relative; line-height:1.6; }
+  .pd-step .pd-num{ position:absolute; left:0; color:var(--amber); }
+  .pd-example{ margin-top:20px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--dim); line-height:1.7; }
+  .pd-example strong{ color:var(--text); font-weight:normal; }
+
+  /* ---- progress ---- */
+  .chart{ display:flex; align-items:flex-end; gap:10px; height:130px; border-bottom:1px solid var(--line); max-width:520px; }
+  .chart-bar{ flex:1; background:linear-gradient(180deg, var(--amber-bright), var(--amber)); min-height:2px; position:relative; }
+  .chart-bar .cb-val{ position:absolute; top:-16px; left:0; right:0; text-align:center; font-size:9.5px; color:var(--dim); }
+  .chart-labels{ display:flex; gap:10px; max-width:520px; margin-bottom:30px; }
+  .chart-labels span{ flex:1; text-align:center; font-size:9px; color:var(--dim); }
+  .hbar-row{ display:flex; align-items:center; gap:12px; margin-bottom:12px; font-size:11px; color:var(--dim); max-width:480px; }
+  .hbar-label{ width:100px; flex-shrink:0; }
+  .hbar-track{ flex:1; height:6px; background:var(--line); }
+  .hbar-fill{ height:100%; background:var(--amber); }
+  .hbar-count{ width:24px; text-align:right; flex-shrink:0; color:var(--text); }
+
+  /* ---- calendar ---- */
+  .cal-top{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .cal-nav{ background:transparent; border:1px solid var(--line); color:var(--dim); font-family:inherit; font-size:12px; padding:5px 12px; cursor:pointer; }
+  .cal-nav:hover{ border-color:var(--amber); color:var(--amber-bright); }
+  .cal-nav.today-btn{ margin-left:auto; }
+  .cal-month{ flex:1; text-align:center; font-size:14px; letter-spacing:2px; color:var(--amber-bright); }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line); border:1px solid var(--line); width:100%; }
+  .cal-dow{ font-size:9.5px; color:var(--dim); text-align:center; letter-spacing:1.5px; padding:8px 0; background:rgba(255,255,255,0.015); }
+  .cal-cell{ min-height:92px; background:var(--panel); font-size:11px; color:var(--dim); padding:6px; cursor:pointer; position:relative; transition:background .12s; }
+  .cal-cell:hover{ background:rgba(217,154,43,0.06); }
+  .cal-cell.empty{ cursor:default; background:var(--bg); }
+  .cal-cell.empty:hover{ background:var(--bg); }
+  .cal-daynum{ font-size:11px; color:var(--dim); margin-bottom:5px; }
+  .cal-cell.today{ box-shadow:inset 0 0 0 1px var(--amber); }
+  .cal-cell.today .cal-daynum{ color:var(--amber-bright); font-weight:bold; }
+  .cal-cell.has-event .cal-daynum{ color:var(--text); }
+  .cal-chip{ font-size:10px; line-height:1.4; color:var(--text); background:rgba(255,255,255,0.04); border-left:2px solid var(--amber); padding:2px 5px; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cal-more{ font-size:9px; color:var(--dim); }
+  .cal-legend{ display:flex; gap:20px; flex-wrap:wrap; font-size:10px; color:var(--dim); letter-spacing:0.5px; margin-top:14px; }
+  .cal-legend span{ display:flex; align-items:center; gap:6px; }
+  .cal-swatch{ display:inline-block; width:9px; height:9px; border:1px solid var(--line); }
+  .cal-swatch.today-swatch{ box-shadow:inset 0 0 0 1px var(--amber); }
+  .cal-swatch.event-swatch{ border-left:2px solid var(--amber); background:rgba(255,255,255,0.04); }
+  @media(max-width:650px){ .cal-cell{ min-height:56px; } .cal-chip{ display:none; } }
+  .cal-event-row{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .cal-event-row:last-child{ border-bottom:none; }
+  .cal-event-date{ width:88px; flex-shrink:0; color:var(--amber-bright); font-size:11px; }
+  .cal-event-name{ flex:1; color:var(--text); }
+  .cal-event-del{ color:var(--dim); cursor:pointer; font-size:11px; }
+  .cal-event-del:hover{ color:var(--danger); }
+  .cal-form{ display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+  .cal-form input{ background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:12px; padding:8px 10px; outline:none; }
+  .cal-form input:focus{ border-color:var(--amber); }
+  .cal-form input[type="text"]{ flex:1; min-width:160px; }
+
+  /* ---- AI lab / notes ---- */
+  .ai-prompt{ display:flex; gap:10px; max-width:640px; margin-bottom:20px; }
+  .ai-prompt input{ flex:1; background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:12.5px; padding:10px 12px; outline:none; }
+  .ai-prompt input:focus{ border-color:var(--amber); }
+  .ai-result{ border:1px solid var(--line); padding:18px 20px; max-width:640px; margin-bottom:10px; }
+  .ai-result .ai-tag{ font-size:9.5px; letter-spacing:1.5px; color:var(--amber); margin-bottom:10px; }
+  .ai-result .ai-text{ font-size:12.5px; color:var(--text); line-height:1.75; }
+  .ai-result .ai-save{ margin-top:14px; display:inline-block; font-size:10.5px; letter-spacing:1px; color:var(--dim); border:1px solid var(--line); padding:5px 11px; cursor:pointer; }
+  .ai-result .ai-save:hover{ border-color:var(--amber); color:var(--amber-bright); }
+  .ai-result .ai-save.saved{ border-color:var(--ok); color:var(--ok); cursor:default; }
+  .note-card{ border:1px solid var(--line); padding:16px 18px; margin-bottom:10px; max-width:640px; }
+  .note-card .note-q{ font-size:10px; letter-spacing:1px; color:var(--amber); margin-bottom:8px; }
+  .note-card .note-body{ font-size:12px; color:var(--text); line-height:1.7; }
+  .note-card .note-del{ float:right; font-size:10.5px; color:var(--dim); cursor:pointer; }
+  .note-card .note-del:hover{ color:var(--danger); }
+
+  /* ---- explore ---- */
+  .explore-card{ border:1px solid var(--line); padding:26px 28px; max-width:600px; }
+  .explore-eyebrow{ display:flex; align-items:center; gap:8px; font-size:10px; letter-spacing:1.5px; color:var(--amber); margin-bottom:16px; }
+  .explore-eyebrow svg{ width:15px; height:15px; }
+  .explore-fact{ font-size:14px; color:var(--text); line-height:1.8; margin-bottom:20px; }
+  .explore-src{ font-size:10.5px; color:var(--dim); }
+
+  /* ============ OVERLAYS (About / Terms / Privacy) ============ */
+  .about-overlay{
+    position:fixed; inset:0; background:rgba(10,10,10,0.97);
+    display:none; align-items:center; justify-content:center; z-index:100;
+    overflow-y:auto; padding:60px 20px;
+  }
+  .about-overlay.active{ display:flex; }
+  .about-box{ width:520px; max-width:88vw; }
+  .about-box .box-title{ color:var(--amber); font-size:14px; letter-spacing:2px; margin-bottom:18px; }
+  .about-box .box-sub{ font-size:12.5px; color:var(--text); line-height:1.8; margin-bottom:10px; }
+  .about-box .box-sub.dim{ color:var(--dim); }
+  .about-back{ font-size:11px; color:var(--dim); margin-top:22px; display:inline-block; }
+  .about-back:hover{ color:var(--amber-bright); }
+</style>
+</head>
+<body>
+
+<!-- ============ PAGE 1: WELCOME ============ -->
+<div class="page visible" id="page-welcome" data-z="10">
+  <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
+  <div class="hero">
+    <div class="steps"><span class="now"></span><span></span><span></span></div>
+    <div class="hero-eyebrow">LM MATHEMATICS · PERSONAL SYSTEM</div>
+    <div class="hero-title">WELCOME TO<br>LM MATHEMATICS</div>
+    <div class="hero-tag">a personal system, built around one module: yours</div>
+    <div class="hero-body">
+      This is a personal system built by <strong>LM</strong>, a software
+      engineering company that designs systems and models. This particular
+      instance is built for Mathematics, and is not intended for any other
+      module — it works closely with what you actually upload and do,
+      rather than tracking you in general.
+    </div>
+    <div class="hero-body">
+      Over the setup that follows, you'll tell it a little about yourself
+      and create an account. From there, the system sets itself up
+      automatically around your module and syncs across any device you
+      sign into — nothing further to configure on your end.
+    </div>
+    <button class="go-btn" id="welcome-go">CONTINUE</button>
+    <div class="foot-msg">please read our <a data-overlay="terms-overlay">terms and services</a> before continuing</div>
+    <div class="foot-msg">already have an account? <a id="welcome-signin">sign in</a></div>
+  </div>
+  <div class="legal">
+    <div class="legal-brand">
+      <svg class="legal-crest" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="gold1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffd98a"/><stop offset="45%" stop-color="#d99a2b"/><stop offset="100%" stop-color="#8a5e14"/>
+        </linearGradient></defs>
+        <g transform="translate(100,100)">
+          <circle r="90" fill="none" stroke="url(#gold1)" stroke-width="10"/>
+          <path d="M-50 22 L-26 -37 L0 6 L26 -37 L50 22 Z" fill="none" stroke="url(#gold1)" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <span class="legal-word">LM</span><span> — an LM product</span>
+    </div>
+    <span>© 2026 LM. All rights reserved. &nbsp;·&nbsp; <a data-overlay="terms-overlay">Terms</a> &nbsp;·&nbsp; <a data-overlay="privacy-overlay">Privacy</a></span>
+  </div>
+</div>
+
+<!-- ============ PAGE 2: ABOUT YOU ============ -->
+<div class="page" id="page-info" data-z="20">
+  <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
+  <div class="box">
+    <div class="steps"><span class="done"></span><span class="now"></span><span></span></div>
+    <div class="box-title">TELL US ABOUT YOU</div>
+    <div class="box-intro">
+      This is what lets the system tailor itself to your specific course —
+      what counts as your syllabus, which past papers are relevant, and how
+      your progress gets measured. It's saved to your account and used
+      only inside this system.
+    </div>
+    <div class="field">
+      <label>NAME</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-name" type="text" placeholder="YOUR NAME" autocomplete="off"></div>
+    </div>
+    <div class="field">
+      <label>DEGREE</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-degree" type="text" placeholder="e.g. BSc Mathematical Sciences" autocomplete="off"></div>
+    </div>
+    <div class="field">
+      <label>INSTITUTION</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-institution" type="text" value="Stellenbosch University" autocomplete="off"></div>
+      <div class="hint">pre-filled — change it if this isn't where you study</div>
+    </div>
+    <div class="field">
+      <label>MODULE</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-module" type="text" value="Mathematics" autocomplete="off"></div>
+      <div class="hint">this instance only covers this module</div>
+    </div>
+    <button class="go-btn full" id="info-go" disabled>NEXT</button>
+    <div class="foot-msg" id="info-msg"></div>
+    <a class="back-link" id="info-back">&larr; back</a>
+  </div>
+  <div class="legal">
+    <div class="legal-brand">
+      <svg class="legal-crest" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(100,100)"><circle r="90" fill="none" stroke="#d99a2b" stroke-width="10"/>
+        <path d="M-50 22 L-26 -37 L0 6 L26 -37 L50 22 Z" fill="none" stroke="#d99a2b" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/></g>
+      </svg>
+      <span class="legal-word">LM</span><span> — an LM product</span>
+    </div>
+    <span>© 2026 LM. All rights reserved.</span>
+  </div>
+</div>
+
+<!-- ============ PAGE 3: ACCOUNT ============ -->
+<div class="page" id="page-password" data-z="30">
+  <div class="box">
+    <div class="steps"><span class="done"></span><span class="done"></span><span class="now"></span></div>
+    <div class="box-title" id="account-title">CREATE YOUR ACCOUNT</div>
+    <div class="box-intro" id="account-intro">
+      An account keeps your uploads, quiz history, and notes synced to you —
+      not just this browser. Sign in with the same email on any device to
+      pick up where you left off.
+    </div>
+    <div class="field">
+      <label>EMAIL</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="acct-email" type="email" placeholder="you@example.com" autocomplete="username"></div>
+    </div>
+    <div class="field">
+      <label>PASSWORD</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="acct-password" type="password" placeholder="at least 6 characters" autocomplete="new-password"></div>
+    </div>
+    <button class="go-btn full" id="pw-go">CREATE ACCOUNT</button>
+    <div class="foot-msg" id="pw-msg"></div>
+    <div style="display:flex; justify-content:space-between; margin-top:14px;">
+      <a class="back-link" id="pw-back" style="margin-top:0;">&larr; back</a>
+      <a class="back-link" id="account-toggle" style="margin-top:0;">sign in instead</a>
+    </div>
+    <a class="back-link" id="account-forgot">forgot password</a>
+    <div class="warn-note">
+      Your account syncs this system across every device you sign into —
+      it isn't tied to this browser. If you forget your password, use the
+      reset link above; LM never sees or stores it in plain text.
+    </div>
+    <div class="disclaimer">
+      This system is here to support your work on this module — it isn't a
+      guarantee of results. What you get out of it depends on how closely
+      you follow the schedule and gaps it identifies for you.
+    </div>
+  </div>
+</div>
+
+<!-- ============ PAGE 4: DASHBOARD ============ -->
+<div class="page dashboard" id="page-dashboard" data-z="40">
+  <div class="dash-top">
+    <div class="dash-mark">
+      <svg class="dash-crest" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(100,100)"><circle r="90" fill="none" stroke="#d99a2b" stroke-width="12"/>
+        <path d="M-50 22 L-26 -37 L0 6 L26 -37 L50 22 Z" fill="none" stroke="#d99a2b" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/></g>
+      </svg>
+      <span class="dash-word">LM</span>
+    </div>
+    <div class="dash-sep"></div>
+    <span class="dash-user" id="dash-user">Mathematics</span>
+    <div class="dash-signout" id="dash-signout" style="margin-left:auto; font-size:11px; color:var(--dim); cursor:pointer;">[ sign out ]</div>
+  </div>
+  <div class="dash-tabs">
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="upload">Upload</div>
+    <div class="tab" data-tab="quiz">Quick Quiz</div>
+    <div class="tab" data-tab="similar">Similar Questions</div>
+    <div class="tab" data-tab="patterns">Solving Patterns</div>
+    <div class="tab" data-tab="ailab">AI Lab</div>
+    <div class="tab" data-tab="ainotes">AI Notes</div>
+    <div class="tab" data-tab="calendar">Calendar</div>
+    <div class="tab" data-tab="explore">Explore</div>
+    <div class="tab" data-tab="progress">Progress</div>
+  </div>
+
+  <div class="dash-body">
+
+    <!-- ---- OVERVIEW ---- -->
+    <div class="tab-panel active" id="panel-overview">
+      <div class="sec-title">This Semester, So Far</div>
+      <div class="stat-row" id="ov-stats"></div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">What's Missing</span><span style="font-size:9.5px;letter-spacing:1.5px;color:var(--amber);">HEURISTIC — NOT A GUARANTEE</span></div>
+        <div class="panel-body"><span id="ov-gap"></span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Recently Added</span></div>
+        <div class="panel-body" id="ov-recent"></div>
+      </div>
+    </div>
+
+    <!-- ---- UPLOAD ---- -->
+    <div class="tab-panel" id="panel-upload">
+      <div class="sec-note">Files upload to your account's storage and sync across devices. The gaps/quiz/similar-questions logic below still runs on placeholder data until a real embedding pipeline reads your uploads.</div>
+      <div class="dropzone" id="dropzone">
+        <div id="dropzone-label">drag files here, or click to browse</div>
+        <input type="file" id="file-input" multiple style="display:none">
+      </div>
+      <div class="cat-choice" id="cat-choice"></div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Uploaded So Far</span></div>
+        <div class="panel-body" id="file-list"></div>
+      </div>
+    </div>
+
+    <!-- ---- QUICK QUIZ ---- -->
+    <div class="tab-panel" id="panel-quiz">
+      <div class="sec-note">Sample questions below — once past papers are uploaded and processed, questions here will be drawn from your own material instead.</div>
+      <div class="sec-title">Quick Quiz</div>
+      <div class="quiz-card" id="quiz-card"></div>
+    </div>
+
+    <!-- ---- SIMILAR QUESTIONS ---- -->
+    <div class="tab-panel" id="panel-similar">
+      <div class="sec-note">Demo dataset below, matched by simple keyword overlap — not a real embedding model yet. This is standing in for what "you have a similar question in the 2020 paper" will actually do once wired to your uploaded papers.</div>
+      <div class="sec-title">Similar Questions</div>
+      <div class="sim-search">
+        <input id="sim-input" type="text" placeholder="paste or type a question...">
+        <button class="go-btn" id="sim-go">SEARCH</button>
+      </div>
+      <div id="sim-results"></div>
+    </div>
+
+    <!-- ---- SOLVING PATTERNS ---- -->
+    <div class="tab-panel" id="panel-patterns">
+      <div class="sec-note">Static, hand-written frameworks per method — not generated per problem, since a confidently wrong framework is worse than none.</div>
+      <div class="sec-title">Solving Patterns</div>
+      <div class="pattern-split">
+        <div class="pattern-list" id="pattern-list"></div>
+        <div class="pattern-detail" id="pattern-detail"></div>
+      </div>
+    </div>
+
+    <!-- ---- AI LAB ---- -->
+    <div class="tab-panel" id="panel-ailab">
+      <div class="sec-note">Ask something about your module. Answers below are placeholder — until this is wired to a real model reading what you've uploaded, this is a demo of the interaction, not real research.</div>
+      <div class="sec-title">AI Lab</div>
+      <div class="ai-prompt">
+        <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
+        <button class="go-btn" id="ai-go">RESEARCH</button>
+      </div>
+      <div id="ai-results"></div>
+    </div>
+
+    <!-- ---- AI NOTES ---- -->
+    <div class="tab-panel" id="panel-ainotes">
+      <div class="sec-note">Anything you save from the AI Lab lands here, so it's not lost in a scroll of past queries.</div>
+      <div class="sec-title">Saved Notes</div>
+      <div id="ainotes-list"></div>
+    </div>
+
+    <!-- ---- CALENDAR ---- -->
+    <div class="tab-panel" id="panel-calendar">
+      <div class="sec-title">Log an Assessment Date</div>
+      <div class="cal-form" style="max-width:960px;">
+        <input type="text" id="cal-name" placeholder="e.g. Semester Test 2">
+        <input type="date" id="cal-date">
+        <button class="go-btn" id="cal-add">ADD</button>
+      </div>
+
+      <div class="panel panel-wide">
+        <div class="panel-head"><span class="panel-title">Calendar</span></div>
+        <div class="panel-body">
+          <div class="cal-top">
+            <button class="cal-nav" id="cal-prev">&larr; PREV</button>
+            <div class="cal-month" id="cal-month-label"></div>
+            <button class="cal-nav" id="cal-next">NEXT &rarr;</button>
+            <button class="cal-nav today-btn" id="cal-today">TODAY</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="cal-legend">
+            <span><i class="cal-swatch today-swatch"></i> today</span>
+            <span><i class="cal-swatch event-swatch"></i> assessment logged</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel panel-wide">
+        <div class="panel-head"><span class="panel-title">Upcoming</span></div>
+        <div class="panel-body" id="cal-list"></div>
+      </div>
+    </div>
+
+    <!-- ---- EXPLORE ---- -->
+    <div class="tab-panel" id="panel-explore">
+      <div class="explore-card">
+        <div class="explore-eyebrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><path d="M10 15 21 6"/><path d="M18 3l3 3-3 3"/><path d="M14 10l1.5 1.5"/></svg>
+          DID YOU KNOW
+        </div>
+        <div class="explore-fact" id="explore-fact"></div>
+        <div class="explore-src" id="explore-src"></div>
+        <button class="go-btn" id="explore-next" style="margin-top:20px;">SHOW ME ANOTHER</button>
+      </div>
+    </div>
+
+    <!-- ---- PROGRESS ---- -->
+    <div class="tab-panel" id="panel-progress">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Quiz Scores Over Time</span></div>
+        <div class="panel-body" id="prog-chart-wrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Uploads By Category</span></div>
+        <div class="panel-body" id="prog-cats"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ ABOUT LM OVERLAY ============ -->
+<div class="about-overlay" id="about-overlay">
+  <div class="about-box">
+    <div class="box-title">ABOUT LM</div>
+    <div class="box-sub">
+      LM is a software engineering company — an agency building systems and
+      models for focused, practical use rather than broad consumer products.
+    </div>
+    <div class="box-sub">
+      LM Mathematics is one such system: a personal tool built around a single
+      module, designed to work closely with what a student actually
+      uploads and does, rather than general-purpose tracking.
+    </div>
+    <div class="box-sub dim">
+      LM is founded and operated by Leo Macamba, and also runs Mathematics,
+      Applied Mathematics, Physics, Programming, Academic Writing, and
+      Economics as separate divisions, alongside client services work.
+    </div>
+    <div class="box-sub dim">
+      For more on LM outside of this system, see
+      <a href="https://lmofficial.vercel.app/index.html" target="_blank" rel="noopener">LM Official</a>.
+    </div>
+    <a class="about-back" data-close-overlay="about-overlay">&larr; back</a>
+  </div>
+</div>
+
+<!-- ============ TERMS OVERLAY ============ -->
+<div class="about-overlay" id="terms-overlay">
+  <div class="about-box">
+    <div class="box-title">TERMS &amp; SERVICES</div>
+    <div class="box-sub dim">Last updated: 2026</div>
+    <div class="box-sub">
+      LM Mathematics is provided as-is, as a personal support tool for your
+      coursework in this module. It does not guarantee any grade, outcome,
+      or result — what you get out of it depends on the work you put in
+      alongside it.
+    </div>
+    <div class="box-sub">
+      This instance is scoped to one student and one module. Content you
+      upload is used only to run the analysis and features within this
+      system, and isn't shared outside it beyond what's needed to operate
+      the system itself.
+    </div>
+    <div class="box-sub">
+      LM reserves the right to update these terms, or the system itself, at
+      any time. Continued use after a change means you accept the current
+      version.
+    </div>
+    <div class="box-sub dim">
+      Questions about these terms can be directed to Leo directly.
+    </div>
+    <a class="about-back" data-close-overlay="terms-overlay">&larr; back</a>
+  </div>
+</div>
+
+<!-- ============ PRIVACY OVERLAY ============ -->
+<div class="about-overlay" id="privacy-overlay">
+  <div class="about-box">
+    <div class="box-title">PRIVACY</div>
+    <div class="box-sub dim">Last updated: 2026</div>
+    <div class="box-sub">
+      The name, degree, institution, and module you provide during setup
+      are used only to tailor this instance to you, and are
+      stored to your account rather than shared with any third
+      party.
+    </div>
+    <div class="box-sub">
+      Your password is used only to lock this system to your browser — it
+      isn't tied to an email address, and isn't used anywhere outside this
+      system.
+    </div>
+    <div class="box-sub">
+      Papers and material you upload are used only to run this system's own
+      analysis for you, not for any purpose beyond this system.
+    </div>
+    <div class="box-sub dim">
+      You can request access to, correction of, or deletion of your
+      information at any time by contacting Leo directly.
+    </div>
+    <a class="about-back" data-close-overlay="privacy-overlay">&larr; back</a>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // FIREBASE CONFIG — replace with your project's config values
+  // (Firebase console → Project settings → General → Your apps → SDK setup)
+  // Reuses the same shape as VAULT's config; can be the same Firebase
+  // project as VAULT (different collection names below keep the data apart)
+  // or a separate project — either works.
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.firebasestorage.app",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // ============================================================
+  // SUPABASE CONFIG — used only for file storage (uploaded papers).
+  // Bucket "tracker" must exist and be set to Public in the Supabase
+  // dashboard (Storage → tracker). Can be the same Supabase project
+  // used elsewhere in LM, with its own bucket.
+  // ============================================================
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  const SUPABASE_BUCKET = "tracker";
+  let supabaseClient = null;
+  try{ supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
+  catch(e){ console.error('Supabase init failed', e); }
+
+  let fbReady = false;
+  let auth = null;
+  let db = null;
+  try{
+    if(firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY"){
+      firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      fbReady = true;
+    }
+  }catch(e){ console.error('Firebase init failed', e); }
+
+  const TRACKER_COLLECTIONS = {
+    papers: 'tracker_papers',
+    quizAttempts: 'tracker_quiz_attempts',
+    aiNotes: 'tracker_ai_notes',
+    events: 'tracker_events'
+  };
+  const PROFILE_COLLECTION = 'tracker_profiles';
+
+  let zCounter = 10;
+  let currentUid = null;
+  let pendingProfile = null;   // collected on page 2, written to Firestore once the account exists
+  let accountMode = 'create';  // 'create' | 'signin'
+  let cameFromWelcomeSignin = false;
+
+  function openPage(id){
+    const el = document.getElementById(id);
+    zCounter += 10;
+    el.style.zIndex = zCounter;
+    el.classList.add('visible');
+    // force reflow so the animation restarts every time
+    void el.offsetWidth;
+    el.classList.remove('enter');
+    void el.offsetWidth;
+    el.classList.add('enter');
+  }
+
+  // ---- overlays (About / Terms / Privacy) — generic open/close ----
+  document.querySelectorAll('[data-overlay]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById(a.dataset.overlay).classList.add('active');
+    });
+  });
+  document.querySelectorAll('[data-close-overlay]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById(a.dataset.closeOverlay).classList.remove('active');
+    });
+  });
+
+  // ---- page 1: welcome ----
+  document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
+  document.getElementById('welcome-signin').addEventListener('click', () => {
+    cameFromWelcomeSignin = true;
+    setAccountMode('signin');
+    openPage('page-password');
+    document.getElementById('acct-email').focus();
+  });
+
+  // ---- page 2: about you ----
+  const infoName = document.getElementById('info-name');
+  const infoDegree = document.getElementById('info-degree');
+  const infoInstitution = document.getElementById('info-institution');
+  const infoModule = document.getElementById('info-module');
+  const infoGo = document.getElementById('info-go');
+  const infoMsg = document.getElementById('info-msg');
+
+  function checkInfo(){
+    infoGo.disabled = infoName.value.trim().length === 0 || infoDegree.value.trim().length === 0;
+    if(!infoGo.disabled) infoMsg.textContent = '';
+  }
+  [infoName, infoDegree].forEach(el => el.addEventListener('input', checkInfo));
+
+  infoGo.addEventListener('click', () => {
+    if(infoGo.disabled){
+      infoMsg.textContent = 'enter at least your name and degree to continue';
+      infoMsg.className = 'foot-msg err';
+      return;
+    }
+    pendingProfile = {
+      name: infoName.value.trim(),
+      degree: infoDegree.value.trim(),
+      institution: infoInstitution.value.trim() || 'Stellenbosch University',
+      module: infoModule.value.trim() || 'Mathematics'
+    };
+    cameFromWelcomeSignin = false;
+    setAccountMode('create');
+    openPage('page-password');
+    document.getElementById('acct-email').focus();
+  });
+  document.getElementById('info-back').addEventListener('click', () => openPage('page-welcome'));
+
+  // ---- page 3: account (Firebase email/password) ----
+  const acctEmail = document.getElementById('acct-email');
+  const acctPassword = document.getElementById('acct-password');
+  const pwGo = document.getElementById('pw-go');
+  const pwMsg = document.getElementById('pw-msg');
+  const accountTitle = document.getElementById('account-title');
+  const accountIntro = document.getElementById('account-intro');
+  const accountToggle = document.getElementById('account-toggle');
+
+  function setAccountMode(mode){
+    accountMode = mode;
+    if(mode === 'signin'){
+      accountTitle.textContent = 'SIGN IN';
+      accountIntro.textContent = 'Sign in with the email and password you set up with, and your uploads, quiz history, and notes will sync right back in.';
+      pwGo.textContent = 'SIGN IN';
+      accountToggle.textContent = 'create an account instead';
+    } else {
+      accountTitle.textContent = 'CREATE YOUR ACCOUNT';
+      accountIntro.textContent = "An account keeps your uploads, quiz history, and notes synced to you — not just this browser. Sign in with the same email on any device to pick up where you left off.";
+      pwGo.textContent = 'CREATE ACCOUNT';
+      accountToggle.textContent = 'sign in instead';
+    }
+    pwMsg.textContent = '';
+  }
+  accountToggle.addEventListener('click', () => setAccountMode(accountMode === 'signin' ? 'create' : 'signin'));
+
+  if(!fbReady){
+    pwMsg.textContent = 'Firebase isn\u2019t configured yet — fill in firebaseConfig near the top of the <script> block, then reload.';
+    pwMsg.className = 'foot-msg err';
+    pwGo.disabled = true;
+  }
+
+  pwGo.addEventListener('click', async () => {
+    if(!fbReady) return;
+    const email = acctEmail.value.trim();
+    const password = acctPassword.value;
+    if(!email || !password){
+      pwMsg.textContent = 'enter your email and password';
+      pwMsg.className = 'foot-msg err';
+      return;
+    }
+    pwMsg.textContent = 'working…';
+    pwMsg.className = 'foot-msg';
+    pwGo.disabled = true;
+    try{
+      if(accountMode === 'create'){
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        const profile = pendingProfile || { name:'', degree:'', institution:'Stellenbosch University', module:'Mathematics' };
+        await db.collection(PROFILE_COLLECTION).doc(cred.user.uid).set({ ...profile, email });
+      } else {
+        await auth.signInWithEmailAndPassword(email, password);
+      }
+      // onAuthStateChanged below takes it from here (loads profile, opens dashboard)
+    }catch(e){
+      pwMsg.textContent = e.message || 'could not complete that — try again';
+      pwMsg.className = 'foot-msg err';
+      pwGo.disabled = false;
+    }
+  });
+  document.getElementById('account-forgot').addEventListener('click', async () => {
+    if(!fbReady) return;
+    const email = acctEmail.value.trim();
+    if(!email){ pwMsg.textContent = 'enter your email above first'; pwMsg.className = 'foot-msg err'; return; }
+    try{
+      await auth.sendPasswordResetEmail(email);
+      pwMsg.textContent = 'password reset email sent';
+      pwMsg.className = 'foot-msg ok';
+    }catch(e){
+      pwMsg.textContent = e.message || 'could not send reset email';
+      pwMsg.className = 'foot-msg err';
+    }
+  });
+  document.getElementById('pw-back').addEventListener('click', () => openPage(cameFromWelcomeSignin ? 'page-welcome' : 'page-info'));
+  document.getElementById('dash-signout').addEventListener('click', () => { if(fbReady) auth.signOut(); });
+
+  // ---- auth state → open the dashboard, or fall back to the wizard ----
+  if(fbReady){
+    auth.onAuthStateChanged(async user => {
+      if(user){
+        currentUid = user.uid;
+        let profile = null;
+        try{
+          const doc = await db.collection(PROFILE_COLLECTION).doc(user.uid).get();
+          profile = doc.exists ? doc.data() : null;
+        }catch(e){ console.error('could not load profile', e); }
+        const name = profile && profile.name ? profile.name : '';
+        const mod = profile && profile.module ? profile.module : 'Mathematics';
+        document.getElementById('dash-user').textContent = (name ? name + ' · ' : '') + mod;
+        attachStoreListeners(user.uid);
+        pwGo.disabled = false;
+        openPage('page-dashboard');
+        renderOverview();
+      } else {
+        currentUid = null;
+        detachStoreListeners();
+        pwGo.disabled = false;
+      }
+    });
+  }
+
+  // ============================================================
+  // DASHBOARD — state, tab switching, and per-tab rendering.
+  // Data now lives in Firestore (tracker_* collections, scoped by uid)
+  // with live onSnapshot listeners, and uploaded files go to Supabase
+  // Storage. Quiz questions, similar-question matches, and AI Lab
+  // answers below are still placeholder content until a real
+  // embedding/Gemini pipeline reads what's actually uploaded.
+  // ============================================================
+  let store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+  let storeUnsubscribers = {};
+
+  function attachStoreListeners(uid){
+    Object.keys(TRACKER_COLLECTIONS).forEach(key => {
+      if(storeUnsubscribers[key]) return;
+      storeUnsubscribers[key] = db.collection(TRACKER_COLLECTIONS[key]).where('uid','==',uid).onSnapshot(snap => {
+        const items = [];
+        snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+        store[key] = items;
+        const activeTab = document.querySelector('.dash-tabs .tab.active');
+        if(activeTab && TAB_RENDER[activeTab.dataset.tab]) TAB_RENDER[activeTab.dataset.tab]();
+      }, err => console.error('store listener error', key, err));
+    });
+  }
+  function detachStoreListeners(){
+    Object.values(storeUnsubscribers).forEach(u => { try{ u(); }catch(e){} });
+    storeUnsubscribers = {};
+    store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+  }
+
+  function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch(e){ return ''; } }
+
+  const UPLOAD_CATS = ['Learning Objectives','Videos','Lecture Notes','Tutorials','My Work / Attempts'];
+  let activeCat = UPLOAD_CATS[0];
+
+  // ---- tab switching ----
+  const TAB_RENDER = {
+    overview: renderOverview, upload: renderUpload, quiz: renderQuizStart, similar: renderSimilar,
+    patterns: renderPatterns, ailab: renderAiLab, ainotes: renderAiNotes, calendar: renderCalendar,
+    explore: renderExplore, progress: renderProgress
+  };
+  document.querySelectorAll('.dash-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.dash-tabs .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      if(TAB_RENDER[tab.dataset.tab]) TAB_RENDER[tab.dataset.tab]();
+    });
+  });
+
+  // ============ OVERVIEW ============
+  function renderOverview(){
+    const counts = {};
+    store.papers.forEach(p => counts[p.category] = (counts[p.category]||0)+1);
+    const total = store.papers.length;
+    const avgQuiz = store.quizAttempts.length ? Math.round(store.quizAttempts.reduce((a,q)=>a+q.score/q.total,0)/store.quizAttempts.length*100) : null;
+    document.getElementById('ov-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">PAPERS UPLOADED</div></div>
+      <div class="stat-card"><div class="stat-num">${avgQuiz===null?'—':avgQuiz+'%'}</div><div class="stat-label">AVG QUIZ SCORE</div></div>
+      <div class="stat-card"><div class="stat-num">${store.events.length}</div><div class="stat-label">ASSESSMENTS LOGGED</div></div>
+      <div class="stat-card"><div class="stat-num">${store.aiNotes.length}</div><div class="stat-label">AI NOTES SAVED</div></div>`;
+    const missing = UPLOAD_CATS.filter(c => !counts[c]);
+    document.getElementById('ov-gap').textContent = total===0
+      ? " You haven't uploaded anything yet — start on the Upload tab and this will fill in."
+      : (missing.length ? ` Nothing uploaded yet under: ${missing.join(', ')}.` : ' You have at least one upload in every category — nice.');
+    const recent = store.papers.slice(-5).reverse();
+    document.getElementById('ov-recent').innerHTML = recent.length ? recent.map(p => `<div class="file-row"><span class="file-tag">${escapeHtml(p.category)}</span><span class="file-name">${escapeHtml(p.name)}</span><span class="file-date">${fmtDate(p.addedAt)}</span></div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
+  }
+
+  // ============ UPLOAD ============
+  function renderUpload(){
+    document.getElementById('cat-choice').innerHTML = UPLOAD_CATS.map(c => `<button class="cat-btn ${c===activeCat?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
+    document.querySelectorAll('.cat-btn').forEach(b => b.addEventListener('click', () => { activeCat = b.dataset.cat; renderUpload(); }));
+    renderFileList();
+  }
+  function renderFileList(){
+    const wrap = document.getElementById('file-list');
+    wrap.innerHTML = store.papers.length ? store.papers.slice().reverse().map(p => `
+      <div class="file-row">
+        <span class="file-tag">${escapeHtml(p.category)}</span>
+        <span class="file-name">${p.file_url ? `<a href="${escapeHtml(p.file_url)}" target="_blank" rel="noopener" style="color:inherit;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</span>
+        <span class="file-date">${fmtDate(p.addedAt)}</span>
+        <span class="file-remove" data-remove="${p.id}">remove</span>
+      </div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
+    wrap.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', async () => {
+      const paper = store.papers.find(p => String(p.id) === el.dataset.remove);
+      try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(el.dataset.remove).delete(); }
+      catch(e){ alert('Could not remove: ' + e.message); return; }
+      if(paper && paper.file_path && supabaseClient){
+        try{ await supabaseClient.storage.from(SUPABASE_BUCKET).remove([paper.file_path]); }catch(e){}
+      }
+    }));
+  }
+  async function addFiles(fileList){
+    const files = Array.from(fileList);
+    if(!files.length) return;
+    if(!fbReady || !currentUid){ alert('Sign in first.'); return; }
+    if(!supabaseClient){ alert('File storage isn\u2019t available \u2014 check the Supabase config.'); return; }
+    const label = document.getElementById('dropzone-label');
+    const originalLabel = label.textContent;
+    for(const f of files){
+      label.textContent = 'uploading ' + f.name + '\u2026';
+      try{
+        const path = `${currentUid}/${Date.now()}_${f.name}`;
+        const { error: upErr } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, f, { upsert:false });
+        if(upErr) throw upErr;
+        const { data: urlData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+        await db.collection(TRACKER_COLLECTIONS.papers).add({
+          uid: currentUid, name: f.name, category: activeCat,
+          addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path
+        });
+      }catch(e){
+        alert('Could not upload "' + f.name + '": ' + (e.message || e));
+      }
+    }
+    label.textContent = originalLabel;
+  }
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('file-input');
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value=''; });
+  ['dragover','dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropzone.classList.toggle('drag', evt==='dragover');
+    if(evt==='drop') addFiles(e.dataTransfer.files);
+  }));
+
+  // ============ QUICK QUIZ ============
+  const QUIZ_BANK = [
+    { q:'What is the derivative of x³ with respect to x?', opts:['3x²','x²','3x','x⁴/4'], correct:0 },
+    { q:'Which technique is most direct for ∫x·eˣ dx?', opts:['Substitution','Integration by parts','Partial fractions','Implicit differentiation'], correct:1 },
+    { q:"If f(x) = ln(x), what is f'(x)?", opts:['1/x','ln(x)/x','x','eˣ'], correct:0 },
+    { q:'A related-rates problem typically starts by:', opts:['Guessing the answer','Writing the constraint equation linking the quantities','Integrating both sides','Finding the second derivative'], correct:1 },
+    { q:'What does the Mean Value Theorem guarantee, given the right conditions?', opts:['A function is always increasing','A point where the tangent slope equals the average rate of change','A function has no roots','A function is continuous everywhere'], correct:1 }
+  ];
+  let quizIdx = 0, quizScore = 0;
+  function renderQuizStart(){ quizIdx = 0; quizScore = 0; renderQuizQuestion(); }
+  function renderQuizQuestion(){
+    const card = document.getElementById('quiz-card');
+    if(quizIdx >= QUIZ_BANK.length){
+      card.innerHTML = `<div class="quiz-summary"><div class="qs-num">${quizScore}/${QUIZ_BANK.length}</div><div class="stat-label" style="margin-top:8px;">QUIZ COMPLETE</div></div>
+        <button class="go-btn full" id="quiz-restart">TRY AGAIN</button>`;
+      document.getElementById('quiz-restart').addEventListener('click', renderQuizStart);
+      if(fbReady && currentUid){
+        db.collection(TRACKER_COLLECTIONS.quizAttempts).add({ uid: currentUid, date: new Date().toISOString(), score: quizScore, total: QUIZ_BANK.length })
+          .catch(e => console.error('could not save quiz attempt', e));
+      }
+      return;
+    }
+    const item = QUIZ_BANK[quizIdx];
+    card.innerHTML = `
+      <div class="quiz-progress">QUESTION ${quizIdx+1} OF ${QUIZ_BANK.length}</div>
+      <div class="quiz-q">${escapeHtml(item.q)}</div>
+      ${item.opts.map((o,i) => `<button class="quiz-opt" data-i="${i}">${escapeHtml(o)}</button>`).join('')}
+      <div class="quiz-foot"><span class="stat-label" id="quiz-feedback"></span></div>`;
+    card.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.i);
+      card.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+      if(i === item.correct){ btn.classList.add('correct'); quizScore++; document.getElementById('quiz-feedback').textContent = 'correct'; }
+      else{
+        btn.classList.add('wrong');
+        card.querySelector(`[data-i="${item.correct}"]`).classList.add('correct');
+        document.getElementById('quiz-feedback').textContent = 'not quite';
+      }
+      setTimeout(() => { quizIdx++; renderQuizQuestion(); }, 900);
+    }));
+  }
+
+  // ============ SIMILAR QUESTIONS ============
+  const SIM_BANK = [
+    { src:'2020 Past Paper, Q4', text:'Find the derivative of f(x) = x³ - 2x² + 5x using first principles.' },
+    { src:'2021 Past Paper, Q2', text:'Use implicit differentiation to find dy/dx for x² + y² = 25.' },
+    { src:'2019 Past Paper, Q6', text:'A ladder 5m long slides down a wall. Find the rate at which the base moves when the top is 3m up.' },
+    { src:'2022 Tutorial 3, Q1', text:'Evaluate ∫x·eˣ dx using integration by parts.' },
+    { src:'2020 Past Paper, Q7', text:'State and apply the Mean Value Theorem for f(x) = x² on [0,2].' },
+    { src:'2023 Past Paper, Q3', text:'Find the derivative of ln(x² + 1).' }
+  ];
+  function simScore(query, text){
+    const qw = new Set(query.toLowerCase().match(/[a-z0-9²³]+/g) || []);
+    const tw = new Set(text.toLowerCase().match(/[a-z0-9²³]+/g) || []);
+    if(!qw.size || !tw.size) return 0;
+    let overlap = 0; qw.forEach(w => { if(tw.has(w)) overlap++; });
+    return overlap / Math.max(qw.size, 1);
+  }
+  function renderSimilar(){
+    document.getElementById('sim-results').innerHTML = '<div class="empty-note">type a question above and press search</div>';
+  }
+  document.getElementById('sim-go').addEventListener('click', () => {
+    const q = document.getElementById('sim-input').value.trim();
+    const wrap = document.getElementById('sim-results');
+    if(!q){ wrap.innerHTML = '<div class="empty-note">type a question first</div>'; return; }
+    const ranked = SIM_BANK.map(s => Object.assign({}, s, { score: simScore(q, s.text) })).sort((a,b) => b.score - a.score).slice(0,3);
+    wrap.innerHTML = ranked.map(r => `
+      <div class="sim-result">
+        <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score*100)}% overlap</span></div>
+        <div class="sim-text">${escapeHtml(r.text)}</div>
+      </div>`).join('');
+  });
+  document.getElementById('sim-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('sim-go').click(); });
+
+  // ============ SOLVING PATTERNS ============
+  const PATTERNS = [
+    { name:'Related Rates', steps:['Identify the changing quantities and label them.','Write the equation that relates them (the constraint).','Differentiate both sides with respect to time.','Substitute the known values and solve.'], example:'A ladder 5m long leans against a wall. If the base slides away at 0.5 m/s, how fast is the top sliding down when the base is 3m from the wall?' },
+    { name:'Integration by Substitution', steps:['Spot an inner function whose derivative also appears.','Let u equal that inner function.','Rewrite the integral entirely in terms of u.','Integrate, then substitute back.'], example:'Evaluate ∫2x·cos(x²) dx.' },
+    { name:'Integration by Parts', steps:['Pick u (easy to differentiate) and dv (easy to integrate).','Apply ∫u dv = uv − ∫v du.','Simplify the remaining integral.','Repeat if needed, or solve directly.'], example:'Evaluate ∫x·eˣ dx.' },
+    { name:'Proof by Induction', steps:['Prove the base case (usually n = 1).','Assume the statement holds for n = k (inductive hypothesis).','Prove it then holds for n = k + 1.','Conclude it holds for all n by induction.'], example:'Prove that 1 + 2 + ... + n = n(n+1)/2 for all positive integers n.' }
+  ];
+  let activePattern = 0;
+  function renderPatterns(){
+    document.getElementById('pattern-list').innerHTML = PATTERNS.map((p,i) => `<div class="pattern-item ${i===activePattern?'active':''}" data-i="${i}">${escapeHtml(p.name)}</div>`).join('');
+    document.querySelectorAll('.pattern-item').forEach(el => el.addEventListener('click', () => { activePattern = Number(el.dataset.i); renderPatterns(); }));
+    const p = PATTERNS[activePattern];
+    document.getElementById('pattern-detail').innerHTML = `
+      <div class="pd-title">${escapeHtml(p.name)}</div>
+      ${p.steps.map((s,i) => `<div class="pd-step"><span class="pd-num">${i+1}.</span> ${escapeHtml(s)}</div>`).join('')}
+      <div class="pd-example"><strong>Example problem:</strong><br>${escapeHtml(p.example)}</div>`;
+  }
+
+  // ============ AI LAB / AI NOTES ============
+  function fakeAiAnswer(q){
+    const lower = q.toLowerCase();
+    if(lower.includes('related rate')) return 'Related-rates problems come up often in this module — start from the Solving Patterns tab, which has the full framework and a worked example.';
+    if(lower.includes('integra')) return 'For integration questions, check whether substitution or integration by parts fits better — the Solving Patterns tab has both frameworks side by side.';
+    return `Once your papers are uploaded and this is wired to a real model, this is where it would search through your own material for "${q}" — for now, this is a placeholder response showing how the interaction will work.`;
+  }
+  function renderAiLab(){ document.getElementById('ai-results').innerHTML = ''; }
+  document.getElementById('ai-go').addEventListener('click', () => {
+    const q = document.getElementById('ai-input').value.trim();
+    if(!q) return;
+    const wrap = document.getElementById('ai-results');
+    const answer = fakeAiAnswer(q);
+    const div = document.createElement('div');
+    div.className = 'ai-result';
+    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">${escapeHtml(answer)}</div><div class="ai-save">SAVE TO AI NOTES</div>`;
+    wrap.prepend(div);
+    document.getElementById('ai-input').value = '';
+    div.querySelector('.ai-save').addEventListener('click', async function(){
+      if(!fbReady || !currentUid) return;
+      try{
+        await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString() });
+        this.textContent = 'SAVED';
+        this.classList.add('saved');
+      }catch(e){ alert('Could not save note: ' + e.message); }
+    });
+  });
+  document.getElementById('ai-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('ai-go').click(); });
+
+  function renderAiNotes(){
+    const wrap = document.getElementById('ainotes-list');
+    wrap.innerHTML = store.aiNotes.length ? store.aiNotes.slice().reverse().map(n => `
+      <div class="note-card">
+        <span class="note-del" data-id="${n.id}">remove</span>
+        <div class="note-q">${escapeHtml(n.q)}</div>
+        <div class="note-body">${escapeHtml(n.a)}</div>
+      </div>`).join('') : '<div class="empty-note">nothing saved yet — save a result from the AI Lab tab</div>';
+    wrap.querySelectorAll('[data-id]').forEach(el => el.addEventListener('click', async () => {
+      try{ await db.collection(TRACKER_COLLECTIONS.aiNotes).doc(el.dataset.id).delete(); }
+      catch(e){ alert('Could not remove note: ' + e.message); }
+    }));
+  }
+
+  // ============ CALENDAR ============
+  let calViewDate = new Date();
+  function calDateStr(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+  function renderCalendar(){
+    const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+    document.getElementById('cal-month-label').textContent = calViewDate.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+    const first = new Date(y, m, 1);
+    const startDow = (first.getDay()+6)%7;
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const today = new Date();
+    const todayStr = calDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+    const byDate = {};
+    store.events.forEach(ev => { (byDate[ev.date] = byDate[ev.date] || []).push(ev); });
+
+    const dows = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+    let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join('');
+    for(let i=0;i<startDow;i++) html += `<div class="cal-cell empty"></div>`;
+    for(let d=1; d<=daysInMonth; d++){
+      const dateStr = calDateStr(y, m, d);
+      const dayEvents = byDate[dateStr] || [];
+      const isToday = dateStr === todayStr;
+      const chips = dayEvents.slice(0,3).map(ev => `<div class="cal-chip" title="${escapeHtml(ev.name)}">${escapeHtml(ev.name)}</div>`).join('');
+      const more = dayEvents.length > 3 ? `<div class="cal-more">+${dayEvents.length-3} more</div>` : '';
+      html += `<div class="cal-cell ${isToday?'today':''} ${dayEvents.length?'has-event':''}" data-day="${dateStr}">
+        <div class="cal-daynum">${d}</div>${chips}${more}
+      </div>`;
+    }
+    const totalCells = startDow + daysInMonth;
+    const trailing = (7 - (totalCells % 7)) % 7;
+    for(let i=0;i<trailing;i++) html += `<div class="cal-cell empty"></div>`;
+    document.getElementById('cal-grid').innerHTML = html;
+    const upcoming = store.events.slice().sort((a,b) => a.date.localeCompare(b.date));
+    document.getElementById('cal-list').innerHTML = upcoming.length ? upcoming.map(ev => `
+      <div class="cal-event-row">
+        <span class="cal-event-date">${escapeHtml(ev.date)}</span>
+        <span class="cal-event-name">${escapeHtml(ev.name)}</span>
+        <span class="cal-event-del" data-id="${ev.id}">remove</span>
+      </div>`).join('') : '<div class="empty-note">no assessment dates logged yet</div>';
+    document.querySelectorAll('.cal-event-del').forEach(el => el.addEventListener('click', async () => {
+      try{ await db.collection(TRACKER_COLLECTIONS.events).doc(el.dataset.id).delete(); }
+      catch(e){ alert('Could not remove: ' + e.message); }
+    }));
+    document.querySelectorAll('.cal-cell[data-day]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        document.getElementById('cal-date').value = cell.dataset.day;
+        document.getElementById('cal-name').focus();
+      });
+    });
+  }
+  document.getElementById('cal-prev').addEventListener('click', () => { calViewDate.setMonth(calViewDate.getMonth()-1); renderCalendar(); });
+  document.getElementById('cal-next').addEventListener('click', () => { calViewDate.setMonth(calViewDate.getMonth()+1); renderCalendar(); });
+  document.getElementById('cal-today').addEventListener('click', () => { calViewDate = new Date(); renderCalendar(); });
+  document.getElementById('cal-add').addEventListener('click', async () => {
+    const name = document.getElementById('cal-name').value.trim();
+    const date = document.getElementById('cal-date').value;
+    if(!name || !date || !fbReady || !currentUid) return;
+    try{
+      await db.collection(TRACKER_COLLECTIONS.events).add({ uid: currentUid, name, date });
+      document.getElementById('cal-name').value = '';
+      document.getElementById('cal-date').value = '';
+    }catch(e){ alert('Could not save: ' + e.message); }
+  });
+
+  // ============ EXPLORE ============
+  const EXPLORE_FACTS = [
+    { fact:'The equals sign (=) was invented in 1557 by Robert Recorde, who said he chose two parallel lines "because no two things can be more equal."', src:"History of mathematical notation" },
+    { fact:'There are infinitely many prime numbers — Euclid proved this over 2000 years ago with a strikingly short proof.', src:"Euclid's Elements, Book IX" },
+    { fact:'The Fibonacci sequence appears in sunflower seed spirals, pinecones, and nautilus shells.', src:'Phyllotaxis research' },
+    { fact:'Calculus was developed independently by both Newton and Leibniz in the late 1600s — the dy/dx notation comes from Leibniz.', src:'History of calculus' },
+    { fact:'"Googol" (10¹⁰⁰) was coined by a 9-year-old in 1920, asked by his mathematician uncle to name a very large number.', src:'Mathematics and the Imagination, Kasner & Newman' },
+    { fact:'"Proof by contradiction" was used to show √2 is irrational — one of the oldest proof techniques still taught today.', src:'Classical Greek mathematics' }
+  ];
+  let exploreIdx = -1;
+  function renderExplore(){
+    let i;
+    do{ i = Math.floor(Math.random()*EXPLORE_FACTS.length); } while(i === exploreIdx && EXPLORE_FACTS.length > 1);
+    exploreIdx = i;
+    document.getElementById('explore-fact').textContent = EXPLORE_FACTS[i].fact;
+    document.getElementById('explore-src').textContent = '— ' + EXPLORE_FACTS[i].src;
+  }
+  document.getElementById('explore-next').addEventListener('click', renderExplore);
+
+  // ============ PROGRESS ============
+  function renderProgress(){
+    const attempts = store.quizAttempts.slice(-8);
+    const chartWrap = document.getElementById('prog-chart-wrap');
+    if(!attempts.length){
+      chartWrap.innerHTML = '<div class="empty-note">no quiz attempts yet — try the Quick Quiz tab</div>';
+    } else {
+      const bars = attempts.map(a => `<div class="chart-bar" style="height:${Math.max(4,Math.round(a.score/a.total*100))}%"><span class="cb-val">${a.score}/${a.total}</span></div>`).join('');
+      const labels = attempts.map((a,i) => `<span>#${i+1}</span>`).join('');
+      chartWrap.innerHTML = `<div class="chart">${bars}</div><div class="chart-labels">${labels}</div>`;
+    }
+    const counts = {};
+    UPLOAD_CATS.forEach(c => counts[c] = 0);
+    store.papers.forEach(p => counts[p.category] = (counts[p.category]||0)+1);
+    const max = Math.max(1, ...Object.values(counts));
+    document.getElementById('prog-cats').innerHTML = UPLOAD_CATS.map(c => `
+      <div class="hbar-row">
+        <span class="hbar-label">${escapeHtml(c)}</span>
+        <div class="hbar-track"><div class="hbar-fill" style="width:${counts[c]/max*100}%"></div></div>
+        <span class="hbar-count">${counts[c]}</span>
+      </div>`).join('');
+  }
+</script>
+
+</body>
+</html>
