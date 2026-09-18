@@ -341,7 +341,7 @@
 </head>
 <body>
 
-<!-- ============ PAGE 1: LANDING (email + password, same box for new & returning) ============ -->
+<!-- ============ PAGE 1: LANDING / ACCESS TERMINAL (sign in only) ============ -->
 <div class="page visible" id="page-landing" data-z="10">
   <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
   <div class="quick-hero">
@@ -357,12 +357,12 @@
     <div class="field">
       <div class="prompt-line"><span class="caret">&gt;</span><input id="landing-password" type="password" placeholder="PASSWORD" autocomplete="current-password"></div>
     </div>
-    <button class="go-btn full" id="landing-go">CONTINUE</button>
+    <button class="go-btn full" id="landing-go">SIGN IN</button>
     <div class="foot-msg" id="landing-msg"></div>
     <div style="display:flex; justify-content:space-between; margin-top:14px;">
       <a class="back-link" id="landing-forgot" style="margin-top:0;">forgot password</a>
     </div>
-    <div class="foot-msg" style="margin-top:14px;">new here? just enter an email and password — please read our <a data-overlay="terms-overlay">terms and services</a> first</div>
+    <div class="foot-msg" style="margin-top:14px;">new here? <a id="landing-start-setup">start setup</a></div>
   </div>
   <div class="legal">
     <div class="legal-brand">
@@ -381,7 +381,7 @@
   </div>
 </div>
 
-<!-- ============ PAGE 2: WELCOME (orientation, first-time signups only) ============ -->
+<!-- ============ PAGE 2: WELCOME (orientation, shown once per device — first visit only) ============ -->
 <div class="page" id="page-welcome" data-z="20">
   <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
   <div class="hero">
@@ -397,10 +397,10 @@
       rather than tracking you in general.
     </div>
     <div class="hero-body">
-      Over the next step, you'll tell it a little about yourself. From
-      there, the system sets itself up automatically around your module
-      and syncs across any device you sign into — nothing further to
-      configure on your end.
+      Over the next step, you'll set up your login and tell it a little
+      about yourself. From there, the system sets itself up automatically
+      around your module and syncs across any device you sign into —
+      nothing further to configure on your end.
     </div>
     <button class="go-btn" id="welcome-go">CONTINUE</button>
   </div>
@@ -416,17 +416,27 @@
   </div>
 </div>
 
-<!-- ============ PAGE 3: ABOUT YOU (finishes account setup) ============ -->
+<!-- ============ PAGE 3: SET UP YOUR ACCOUNT (login details + about you — creates the account) ============ -->
 <div class="page" id="page-info" data-z="30">
   <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
   <div class="box">
     <div class="steps"><span class="done"></span><span class="now"></span></div>
-    <div class="box-title">TELL US ABOUT YOU</div>
+    <div class="box-title">SET UP YOUR ACCOUNT</div>
     <div class="box-intro">
-      This is what lets the system tailor itself to your specific course —
-      what counts as your syllabus, which past papers are relevant, and how
-      your progress gets measured. It's saved to your account and used
-      only inside this system.
+      Choose the email and password you'll sign in with, then tell us a
+      little about yourself — this is what lets the system tailor itself
+      to your specific course. It's saved to your account and used only
+      inside this system. Please read our
+      <a data-overlay="terms-overlay">terms and services</a> before continuing.
+    </div>
+    <div class="field">
+      <label>EMAIL</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-email" type="email" placeholder="EMAIL" autocomplete="username"></div>
+    </div>
+    <div class="field">
+      <label>PASSWORD</label>
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="info-password" type="password" placeholder="PASSWORD" autocomplete="new-password"></div>
+      <div class="hint">min 6 characters</div>
     </div>
     <div class="field">
       <label>NAME</label>
@@ -695,9 +705,8 @@
       party.
     </div>
     <div class="box-sub">
-      Your password is used only to lock this system to your browser — it
-      isn't tied to an email address, and isn't used anywhere outside this
-      system.
+      Your password is used only to lock this system to your account — it
+      isn't used anywhere outside this system.
     </div>
     <div class="box-sub">
       Papers and material you upload are used only to run this system's own
@@ -764,8 +773,6 @@
 
   let zCounter = 10;
   let currentUid = null;
-  let pendingEmail = null;     // captured on the landing page for brand-new signups
-  let pendingPassword = null;  // only held in memory until FINISH SETUP creates the account
 
   function openPage(id){
     const el = document.getElementById(id);
@@ -777,6 +784,26 @@
     el.classList.remove('enter');
     void el.offsetWidth;
     el.classList.add('enter');
+  }
+
+  // ============================================================
+  // FIRST-VISIT GATING — Welcome only ever shows once per device.
+  // There's no account yet to check at this point, so a local flag
+  // is the only signal available: unset → this device has never
+  // finished setup, so show Welcome first. Set → skip straight to
+  // the sign-in (Access Terminal) page.
+  // ============================================================
+  const SETUP_FLAG_KEY = 'lm_math_setup_complete_v1';
+  function hasCompletedSetupBefore(){
+    try{ return localStorage.getItem(SETUP_FLAG_KEY) === '1'; }
+    catch(e){ return true; } // if storage is blocked, don't trap the user on Welcome forever
+  }
+  function markSetupComplete(){
+    try{ localStorage.setItem(SETUP_FLAG_KEY, '1'); }catch(e){}
+  }
+  if(!hasCompletedSetupBefore()){
+    document.getElementById('page-landing').classList.remove('visible');
+    openPage('page-welcome');
   }
 
   // ---- overlays (About / Terms / Privacy) — generic open/close ----
@@ -791,7 +818,7 @@
     });
   });
 
-  // ---- page 1: landing (email + password — same box for new & returning) ----
+  // ---- page 1: landing / access terminal (sign in only) ----
   const landingEmail = document.getElementById('landing-email');
   const landingPassword = document.getElementById('landing-password');
   const landingGo = document.getElementById('landing-go');
@@ -816,25 +843,15 @@
     landingMsg.className = 'foot-msg';
     landingGo.disabled = true;
     try{
-      const methods = await auth.fetchSignInMethodsForEmail(email);
-      if(methods.length > 0){
-        // existing account — sign in; onAuthStateChanged below opens the dashboard
-        await auth.signInWithEmailAndPassword(email, password);
-      } else {
-        // brand new — one more step (About You) before the account is actually created
-        if(password.length < 6){
-          landingMsg.textContent = 'password needs to be at least 6 characters';
-          landingMsg.className = 'foot-msg err';
-          landingGo.disabled = false;
-          return;
-        }
-        pendingEmail = email;
-        pendingPassword = password;
-        landingMsg.textContent = '';
-        openPage('page-welcome');
-      }
+      await auth.signInWithEmailAndPassword(email, password);
+      markSetupComplete(); // confirms this device is known, in case the flag was ever missed
+      // onAuthStateChanged below takes it from here and opens the dashboard
     }catch(e){
-      landingMsg.textContent = e.message || 'could not continue — try again';
+      if(e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password'){
+        landingMsg.textContent = 'no match for that email/password — new here? use "start setup" below';
+      } else {
+        landingMsg.textContent = e.message || 'could not sign in — try again';
+      }
       landingMsg.className = 'foot-msg err';
     }
     landingGo.disabled = false;
@@ -852,11 +869,14 @@
       landingMsg.className = 'foot-msg err';
     }
   });
+  document.getElementById('landing-start-setup').addEventListener('click', () => openPage('page-welcome'));
 
-  // ---- page 2: welcome (orientation for brand-new signups) ----
+  // ---- page 2: welcome (orientation for brand-new devices) ----
   document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
 
-  // ---- page 3: about you (creates the account + profile) ----
+  // ---- page 3: set up your account (login details + about you → creates the account) ----
+  const infoEmail = document.getElementById('info-email');
+  const infoPassword = document.getElementById('info-password');
   const infoName = document.getElementById('info-name');
   const infoDegree = document.getElementById('info-degree');
   const infoInstitution = document.getElementById('info-institution');
@@ -865,22 +885,23 @@
   const infoMsg = document.getElementById('info-msg');
 
   function checkInfo(){
-    infoGo.disabled = infoName.value.trim().length === 0 || infoDegree.value.trim().length === 0;
+    const valid = infoEmail.value.trim().length > 0
+      && infoPassword.value.length >= 6
+      && infoName.value.trim().length > 0
+      && infoDegree.value.trim().length > 0;
+    infoGo.disabled = !valid;
     if(!infoGo.disabled) infoMsg.textContent = '';
   }
-  [infoName, infoDegree].forEach(el => el.addEventListener('input', checkInfo));
+  [infoEmail, infoPassword, infoName, infoDegree].forEach(el => el.addEventListener('input', checkInfo));
 
   infoGo.addEventListener('click', async () => {
     if(infoGo.disabled){
-      infoMsg.textContent = 'enter at least your name and degree to continue';
+      infoMsg.textContent = 'fill in your email, a password (min 6 characters), name, and degree to continue';
       infoMsg.className = 'foot-msg err';
       return;
     }
-    if(!pendingEmail || !pendingPassword){
-      infoMsg.textContent = 'something went wrong — go back and enter your email and password again';
-      infoMsg.className = 'foot-msg err';
-      return;
-    }
+    const email = infoEmail.value.trim();
+    const password = infoPassword.value;
     const profile = {
       name: infoName.value.trim(),
       degree: infoDegree.value.trim(),
@@ -891,10 +912,16 @@
     infoMsg.textContent = 'creating your account…';
     infoMsg.className = 'foot-msg';
     try{
-      const cred = await auth.createUserWithEmailAndPassword(pendingEmail, pendingPassword);
-      await db.collection(PROFILE_COLLECTION).doc(cred.user.uid).set({ ...profile, email: pendingEmail });
-      pendingPassword = null;
-      // onAuthStateChanged below takes it from here and opens the dashboard
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await db.collection(PROFILE_COLLECTION).doc(cred.user.uid).set({ ...profile, email });
+      markSetupComplete(); // Welcome will never show on this device again
+      await auth.signOut(); // land back on the sign-in page rather than auto-entering the dashboard
+      infoPassword.value = '';
+      landingEmail.value = email;
+      landingPassword.value = '';
+      landingMsg.textContent = 'account created — sign in below to continue';
+      landingMsg.className = 'foot-msg ok';
+      openPage('page-landing');
     }catch(e){
       infoMsg.textContent = e.message || 'could not create your account — try again';
       infoMsg.className = 'foot-msg err';
@@ -902,13 +929,18 @@
     }
   });
   document.getElementById('info-back').addEventListener('click', () => openPage('page-welcome'));
-  document.getElementById('dash-signout').addEventListener('click', () => { if(fbReady) auth.signOut(); });
+  document.getElementById('dash-signout').addEventListener('click', async () => {
+    if(!fbReady) return;
+    await auth.signOut();
+    openPage('page-landing');
+  });
 
   // ---- auth state → open the dashboard, or fall back to the landing page ----
   if(fbReady){
     auth.onAuthStateChanged(async user => {
       if(user){
         currentUid = user.uid;
+        markSetupComplete();
         let profile = null;
         try{
           const doc = await db.collection(PROFILE_COLLECTION).doc(user.uid).get();
