@@ -78,6 +78,21 @@
   .back-link{ font-size:11px; color:var(--dim); margin-top:16px; display:inline-block; }
   .back-link:hover{ color:var(--amber-bright); }
 
+  /* ---- landing (matches the reference terminal-lock screenshot) ---- */
+  .quick-hero{ position:absolute; top:50%; left:8vw; transform:translateY(-50%); text-align:left; }
+  .quick-title{
+    font-family:inherit; font-size:clamp(28px, 4.2vw, 44px); letter-spacing:8px; font-weight:400;
+    color:var(--amber);
+  }
+  .quick-divider{ width:230px; height:1px; background:var(--line); margin:26px 0; }
+  .quick-tag{ font-size:11px; letter-spacing:5px; color:var(--dim); }
+  .quick-box{ position:absolute; bottom:14vh; right:6vw; width:340px; max-width:80vw; }
+  .quick-box .box-title{ letter-spacing:2px; }
+  @media(max-width:760px){
+    .quick-hero{ position:relative; left:auto; top:auto; transform:none; margin:0 auto 60px; }
+    .quick-box{ position:relative; bottom:auto; right:auto; width:100%; max-width:420px; margin:0 auto; }
+  }
+
   /* ---- welcome page ---- */
   .hero{ text-align:center; max-width:640px; }
   .hero-eyebrow{ font-size:11px; letter-spacing:4px; color:var(--dim); margin-bottom:18px; }
@@ -326,30 +341,28 @@
 </head>
 <body>
 
-<!-- ============ PAGE 1: WELCOME ============ -->
-<div class="page visible" id="page-welcome" data-z="10">
+<!-- ============ PAGE 1: LANDING (email + password, same box for new & returning) ============ -->
+<div class="page visible" id="page-landing" data-z="10">
   <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
-  <div class="hero">
-    <div class="steps"><span class="now"></span><span></span><span></span></div>
-    <div class="hero-eyebrow">LM MATHEMATICS · PERSONAL SYSTEM</div>
-    <div class="hero-title">WELCOME TO<br>LM MATHEMATICS</div>
-    <div class="hero-tag">a personal system, built around one module: yours</div>
-    <div class="hero-body">
-      This is a personal system built by <strong>LM</strong>, a software
-      engineering company that designs systems and models. This particular
-      instance is built for Mathematics, and is not intended for any other
-      module — it works closely with what you actually upload and do,
-      rather than tracking you in general.
+  <div class="quick-hero">
+    <div class="quick-title">LM MATHEMATICS</div>
+    <div class="quick-divider"></div>
+    <div class="quick-tag">EST. PERSONAL SYSTEM</div>
+  </div>
+  <div class="quick-box">
+    <div class="box-title">ACCESS YOUR TERMINAL</div>
+    <div class="field">
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="landing-email" type="email" placeholder="EMAIL" autocomplete="username"></div>
     </div>
-    <div class="hero-body">
-      Over the setup that follows, you'll tell it a little about yourself
-      and create an account. From there, the system sets itself up
-      automatically around your module and syncs across any device you
-      sign into — nothing further to configure on your end.
+    <div class="field">
+      <div class="prompt-line"><span class="caret">&gt;</span><input id="landing-password" type="password" placeholder="PASSWORD" autocomplete="current-password"></div>
     </div>
-    <button class="go-btn" id="welcome-go">CONTINUE</button>
-    <div class="foot-msg">please read our <a data-overlay="terms-overlay">terms and services</a> before continuing</div>
-    <div class="foot-msg">already have an account? <a id="welcome-signin">sign in</a></div>
+    <button class="go-btn full" id="landing-go">CONTINUE</button>
+    <div class="foot-msg" id="landing-msg"></div>
+    <div style="display:flex; justify-content:space-between; margin-top:14px;">
+      <a class="back-link" id="landing-forgot" style="margin-top:0;">forgot password</a>
+    </div>
+    <div class="foot-msg" style="margin-top:14px;">new here? just enter an email and password — please read our <a data-overlay="terms-overlay">terms and services</a> first</div>
   </div>
   <div class="legal">
     <div class="legal-brand">
@@ -368,11 +381,46 @@
   </div>
 </div>
 
-<!-- ============ PAGE 2: ABOUT YOU ============ -->
-<div class="page" id="page-info" data-z="20">
+<!-- ============ PAGE 2: WELCOME (orientation, first-time signups only) ============ -->
+<div class="page" id="page-welcome" data-z="20">
+  <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
+  <div class="hero">
+    <div class="steps"><span class="now"></span><span></span></div>
+    <div class="hero-eyebrow">LM MATHEMATICS · PERSONAL SYSTEM</div>
+    <div class="hero-title">WELCOME TO<br>LM MATHEMATICS</div>
+    <div class="hero-tag">a personal system, built around one module: yours</div>
+    <div class="hero-body">
+      This is a personal system built by <strong>LM</strong>, a software
+      engineering company that designs systems and models. This particular
+      instance is built for Mathematics, and is not intended for any other
+      module — it works closely with what you actually upload and do,
+      rather than tracking you in general.
+    </div>
+    <div class="hero-body">
+      Over the next step, you'll tell it a little about yourself. From
+      there, the system sets itself up automatically around your module
+      and syncs across any device you sign into — nothing further to
+      configure on your end.
+    </div>
+    <button class="go-btn" id="welcome-go">CONTINUE</button>
+  </div>
+  <div class="legal">
+    <div class="legal-brand">
+      <svg class="legal-crest" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(100,100)"><circle r="90" fill="none" stroke="#d99a2b" stroke-width="10"/>
+        <path d="M-50 22 L-26 -37 L0 6 L26 -37 L50 22 Z" fill="none" stroke="#d99a2b" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/></g>
+      </svg>
+      <span class="legal-word">LM</span><span> — an LM product</span>
+    </div>
+    <span>© 2026 LM. All rights reserved.</span>
+  </div>
+</div>
+
+<!-- ============ PAGE 3: ABOUT YOU (finishes account setup) ============ -->
+<div class="page" id="page-info" data-z="30">
   <div class="id-line"><a data-overlay="about-overlay">MORE ABOUT LM COMPANY</a></div>
   <div class="box">
-    <div class="steps"><span class="done"></span><span class="now"></span><span></span></div>
+    <div class="steps"><span class="done"></span><span class="now"></span></div>
     <div class="box-title">TELL US ABOUT YOU</div>
     <div class="box-intro">
       This is what lets the system tailor itself to your specific course —
@@ -398,7 +446,7 @@
       <div class="prompt-line"><span class="caret">&gt;</span><input id="info-module" type="text" value="Mathematics" autocomplete="off"></div>
       <div class="hint">this instance only covers this module</div>
     </div>
-    <button class="go-btn full" id="info-go" disabled>NEXT</button>
+    <button class="go-btn full" id="info-go" disabled>FINISH SETUP</button>
     <div class="foot-msg" id="info-msg"></div>
     <a class="back-link" id="info-back">&larr; back</a>
   </div>
@@ -411,44 +459,6 @@
       <span class="legal-word">LM</span><span> — an LM product</span>
     </div>
     <span>© 2026 LM. All rights reserved.</span>
-  </div>
-</div>
-
-<!-- ============ PAGE 3: ACCOUNT ============ -->
-<div class="page" id="page-password" data-z="30">
-  <div class="box">
-    <div class="steps"><span class="done"></span><span class="done"></span><span class="now"></span></div>
-    <div class="box-title" id="account-title">CREATE YOUR ACCOUNT</div>
-    <div class="box-intro" id="account-intro">
-      An account keeps your uploads, quiz history, and notes synced to you —
-      not just this browser. Sign in with the same email on any device to
-      pick up where you left off.
-    </div>
-    <div class="field">
-      <label>EMAIL</label>
-      <div class="prompt-line"><span class="caret">&gt;</span><input id="acct-email" type="email" placeholder="you@example.com" autocomplete="username"></div>
-    </div>
-    <div class="field">
-      <label>PASSWORD</label>
-      <div class="prompt-line"><span class="caret">&gt;</span><input id="acct-password" type="password" placeholder="at least 6 characters" autocomplete="new-password"></div>
-    </div>
-    <button class="go-btn full" id="pw-go">CREATE ACCOUNT</button>
-    <div class="foot-msg" id="pw-msg"></div>
-    <div style="display:flex; justify-content:space-between; margin-top:14px;">
-      <a class="back-link" id="pw-back" style="margin-top:0;">&larr; back</a>
-      <a class="back-link" id="account-toggle" style="margin-top:0;">sign in instead</a>
-    </div>
-    <a class="back-link" id="account-forgot">forgot password</a>
-    <div class="warn-note">
-      Your account syncs this system across every device you sign into —
-      it isn't tied to this browser. If you forget your password, use the
-      reset link above; LM never sees or stores it in plain text.
-    </div>
-    <div class="disclaimer">
-      This system is here to support your work on this module — it isn't a
-      guarantee of results. What you get out of it depends on how closely
-      you follow the schedule and gaps it identifies for you.
-    </div>
   </div>
 </div>
 
@@ -754,9 +764,8 @@
 
   let zCounter = 10;
   let currentUid = null;
-  let pendingProfile = null;   // collected on page 2, written to Firestore once the account exists
-  let accountMode = 'create';  // 'create' | 'signin'
-  let cameFromWelcomeSignin = false;
+  let pendingEmail = null;     // captured on the landing page for brand-new signups
+  let pendingPassword = null;  // only held in memory until FINISH SETUP creates the account
 
   function openPage(id){
     const el = document.getElementById(id);
@@ -782,16 +791,72 @@
     });
   });
 
-  // ---- page 1: welcome ----
-  document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
-  document.getElementById('welcome-signin').addEventListener('click', () => {
-    cameFromWelcomeSignin = true;
-    setAccountMode('signin');
-    openPage('page-password');
-    document.getElementById('acct-email').focus();
+  // ---- page 1: landing (email + password — same box for new & returning) ----
+  const landingEmail = document.getElementById('landing-email');
+  const landingPassword = document.getElementById('landing-password');
+  const landingGo = document.getElementById('landing-go');
+  const landingMsg = document.getElementById('landing-msg');
+
+  if(!fbReady){
+    landingMsg.textContent = 'Firebase isn\u2019t configured yet — fill in firebaseConfig near the top of the <script> block, then reload.';
+    landingMsg.className = 'foot-msg err';
+    landingGo.disabled = true;
+  }
+
+  landingGo.addEventListener('click', async () => {
+    if(!fbReady) return;
+    const email = landingEmail.value.trim();
+    const password = landingPassword.value;
+    if(!email || !password){
+      landingMsg.textContent = 'enter your email and password';
+      landingMsg.className = 'foot-msg err';
+      return;
+    }
+    landingMsg.textContent = 'working…';
+    landingMsg.className = 'foot-msg';
+    landingGo.disabled = true;
+    try{
+      const methods = await auth.fetchSignInMethodsForEmail(email);
+      if(methods.length > 0){
+        // existing account — sign in; onAuthStateChanged below opens the dashboard
+        await auth.signInWithEmailAndPassword(email, password);
+      } else {
+        // brand new — one more step (About You) before the account is actually created
+        if(password.length < 6){
+          landingMsg.textContent = 'password needs to be at least 6 characters';
+          landingMsg.className = 'foot-msg err';
+          landingGo.disabled = false;
+          return;
+        }
+        pendingEmail = email;
+        pendingPassword = password;
+        landingMsg.textContent = '';
+        openPage('page-welcome');
+      }
+    }catch(e){
+      landingMsg.textContent = e.message || 'could not continue — try again';
+      landingMsg.className = 'foot-msg err';
+    }
+    landingGo.disabled = false;
+  });
+  document.getElementById('landing-forgot').addEventListener('click', async () => {
+    if(!fbReady) return;
+    const email = landingEmail.value.trim();
+    if(!email){ landingMsg.textContent = 'enter your email above first'; landingMsg.className = 'foot-msg err'; return; }
+    try{
+      await auth.sendPasswordResetEmail(email);
+      landingMsg.textContent = 'password reset email sent';
+      landingMsg.className = 'foot-msg ok';
+    }catch(e){
+      landingMsg.textContent = e.message || 'could not send reset email';
+      landingMsg.className = 'foot-msg err';
+    }
   });
 
-  // ---- page 2: about you ----
+  // ---- page 2: welcome (orientation for brand-new signups) ----
+  document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
+
+  // ---- page 3: about you (creates the account + profile) ----
   const infoName = document.getElementById('info-name');
   const infoDegree = document.getElementById('info-degree');
   const infoInstitution = document.getElementById('info-institution');
@@ -805,101 +870,41 @@
   }
   [infoName, infoDegree].forEach(el => el.addEventListener('input', checkInfo));
 
-  infoGo.addEventListener('click', () => {
+  infoGo.addEventListener('click', async () => {
     if(infoGo.disabled){
       infoMsg.textContent = 'enter at least your name and degree to continue';
       infoMsg.className = 'foot-msg err';
       return;
     }
-    pendingProfile = {
+    if(!pendingEmail || !pendingPassword){
+      infoMsg.textContent = 'something went wrong — go back and enter your email and password again';
+      infoMsg.className = 'foot-msg err';
+      return;
+    }
+    const profile = {
       name: infoName.value.trim(),
       degree: infoDegree.value.trim(),
       institution: infoInstitution.value.trim() || 'Stellenbosch University',
       module: infoModule.value.trim() || 'Mathematics'
     };
-    cameFromWelcomeSignin = false;
-    setAccountMode('create');
-    openPage('page-password');
-    document.getElementById('acct-email').focus();
+    infoGo.disabled = true;
+    infoMsg.textContent = 'creating your account…';
+    infoMsg.className = 'foot-msg';
+    try{
+      const cred = await auth.createUserWithEmailAndPassword(pendingEmail, pendingPassword);
+      await db.collection(PROFILE_COLLECTION).doc(cred.user.uid).set({ ...profile, email: pendingEmail });
+      pendingPassword = null;
+      // onAuthStateChanged below takes it from here and opens the dashboard
+    }catch(e){
+      infoMsg.textContent = e.message || 'could not create your account — try again';
+      infoMsg.className = 'foot-msg err';
+      infoGo.disabled = false;
+    }
   });
   document.getElementById('info-back').addEventListener('click', () => openPage('page-welcome'));
-
-  // ---- page 3: account (Firebase email/password) ----
-  const acctEmail = document.getElementById('acct-email');
-  const acctPassword = document.getElementById('acct-password');
-  const pwGo = document.getElementById('pw-go');
-  const pwMsg = document.getElementById('pw-msg');
-  const accountTitle = document.getElementById('account-title');
-  const accountIntro = document.getElementById('account-intro');
-  const accountToggle = document.getElementById('account-toggle');
-
-  function setAccountMode(mode){
-    accountMode = mode;
-    if(mode === 'signin'){
-      accountTitle.textContent = 'SIGN IN';
-      accountIntro.textContent = 'Sign in with the email and password you set up with, and your uploads, quiz history, and notes will sync right back in.';
-      pwGo.textContent = 'SIGN IN';
-      accountToggle.textContent = 'create an account instead';
-    } else {
-      accountTitle.textContent = 'CREATE YOUR ACCOUNT';
-      accountIntro.textContent = "An account keeps your uploads, quiz history, and notes synced to you — not just this browser. Sign in with the same email on any device to pick up where you left off.";
-      pwGo.textContent = 'CREATE ACCOUNT';
-      accountToggle.textContent = 'sign in instead';
-    }
-    pwMsg.textContent = '';
-  }
-  accountToggle.addEventListener('click', () => setAccountMode(accountMode === 'signin' ? 'create' : 'signin'));
-
-  if(!fbReady){
-    pwMsg.textContent = 'Firebase isn\u2019t configured yet — fill in firebaseConfig near the top of the <script> block, then reload.';
-    pwMsg.className = 'foot-msg err';
-    pwGo.disabled = true;
-  }
-
-  pwGo.addEventListener('click', async () => {
-    if(!fbReady) return;
-    const email = acctEmail.value.trim();
-    const password = acctPassword.value;
-    if(!email || !password){
-      pwMsg.textContent = 'enter your email and password';
-      pwMsg.className = 'foot-msg err';
-      return;
-    }
-    pwMsg.textContent = 'working…';
-    pwMsg.className = 'foot-msg';
-    pwGo.disabled = true;
-    try{
-      if(accountMode === 'create'){
-        const cred = await auth.createUserWithEmailAndPassword(email, password);
-        const profile = pendingProfile || { name:'', degree:'', institution:'Stellenbosch University', module:'Mathematics' };
-        await db.collection(PROFILE_COLLECTION).doc(cred.user.uid).set({ ...profile, email });
-      } else {
-        await auth.signInWithEmailAndPassword(email, password);
-      }
-      // onAuthStateChanged below takes it from here (loads profile, opens dashboard)
-    }catch(e){
-      pwMsg.textContent = e.message || 'could not complete that — try again';
-      pwMsg.className = 'foot-msg err';
-      pwGo.disabled = false;
-    }
-  });
-  document.getElementById('account-forgot').addEventListener('click', async () => {
-    if(!fbReady) return;
-    const email = acctEmail.value.trim();
-    if(!email){ pwMsg.textContent = 'enter your email above first'; pwMsg.className = 'foot-msg err'; return; }
-    try{
-      await auth.sendPasswordResetEmail(email);
-      pwMsg.textContent = 'password reset email sent';
-      pwMsg.className = 'foot-msg ok';
-    }catch(e){
-      pwMsg.textContent = e.message || 'could not send reset email';
-      pwMsg.className = 'foot-msg err';
-    }
-  });
-  document.getElementById('pw-back').addEventListener('click', () => openPage(cameFromWelcomeSignin ? 'page-welcome' : 'page-info'));
   document.getElementById('dash-signout').addEventListener('click', () => { if(fbReady) auth.signOut(); });
 
-  // ---- auth state → open the dashboard, or fall back to the wizard ----
+  // ---- auth state → open the dashboard, or fall back to the landing page ----
   if(fbReady){
     auth.onAuthStateChanged(async user => {
       if(user){
@@ -913,13 +918,11 @@
         const mod = profile && profile.module ? profile.module : 'Mathematics';
         document.getElementById('dash-user').textContent = (name ? name + ' · ' : '') + mod;
         attachStoreListeners(user.uid);
-        pwGo.disabled = false;
         openPage('page-dashboard');
         renderOverview();
       } else {
         currentUid = null;
         detachStoreListeners();
-        pwGo.disabled = false;
       }
     });
   }
