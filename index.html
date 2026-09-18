@@ -703,29 +703,30 @@
 
 <script>
   // ============================================================
-  // FIREBASE CONFIG — replace with your project's config values
-  // (Firebase console → Project settings → General → Your apps → SDK setup)
-  // Reuses the same shape as VAULT's config; can be the same Firebase
-  // project as VAULT (different collection names below keep the data apart)
-  // or a separate project — either works.
+  // FIREBASE CONFIG — same Firebase project as VAULT (leomacamba-ef46b).
+  // The tracker's Firestore collections are all prefixed `tracker_`
+  // (see TRACKER_COLLECTIONS / PROFILE_COLLECTION below), so it shares
+  // the project without colliding with VAULT's own collections
+  // (research, models, experiments, datasets, comms, curriculum_*, etc).
   // ============================================================
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.firebasestorage.app",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAusqKeSI-q8tp1tes0KB0oqidyp9bXvpE",
+    authDomain: "leomacamba-ef46b.firebaseapp.com",
+    projectId: "leomacamba-ef46b",
+    storageBucket: "leomacamba-ef46b.firebasestorage.app",
+    messagingSenderId: "940306071411",
+    appId: "1:940306071411:web:5012fd44bb1741558f4f06",
+    measurementId: "G-9R6S1QNGR0"
   };
 
   // ============================================================
-  // SUPABASE CONFIG — used only for file storage (uploaded papers).
-  // Bucket "tracker" must exist and be set to Public in the Supabase
-  // dashboard (Storage → tracker). Can be the same Supabase project
-  // used elsewhere in LM, with its own bucket.
+  // SUPABASE CONFIG — same Supabase project as VAULT, but its own
+  // bucket ("tracker") so uploaded papers stay separate from VAULT's
+  // "vault" bucket. Create this bucket in the Supabase dashboard
+  // (Storage → New bucket → "tracker" → Public) before uploads will work.
   // ============================================================
-  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
-  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  const SUPABASE_URL = "https://elkgablfrpncvbfsrtfv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_6tBEPib983zeQdenWz5i-Q_DV6cC5gJ";
   const SUPABASE_BUCKET = "tracker";
   let supabaseClient = null;
   try{ supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
