@@ -231,9 +231,8 @@
   .lm-title{ font-size:clamp(14px,1.6vw,19px); font-weight:300; color:var(--amber-bright); letter-spacing:3px; text-transform:uppercase; margin-bottom:14px; }
   .ws-header .lm-title{ margin-bottom:0; }
   .ws-timer-box{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; width:132px; flex-shrink:0; }
-  .ws-tank{ position:relative; width:100%; height:26px; border:1px solid var(--line); background:rgba(255,255,255,0.02); overflow:hidden; }
-  .ws-tank-fill{ position:absolute; top:0; bottom:0; left:0; background:linear-gradient(90deg, var(--amber), var(--amber-bright)); transition:width .4s linear; }
-  .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; color:var(--amber-bright); font-variant-numeric:tabular-nums; text-shadow:0 0 4px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.9); pointer-events:none; }
+  .ws-tank{ position:relative; width:100%; height:26px; border:1px solid var(--amber); background:transparent; overflow:hidden; transition:border-color .4s linear; }
+  .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; color:#fff; font-variant-numeric:tabular-nums; pointer-events:none; }
   .ws-timer-controls{ display:flex; gap:5px; justify-content:flex-end; flex-wrap:wrap; width:100%; }
   .ws-timer-controls input{ width:42px; background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:10px; padding:4px 5px; text-align:center; }
   .ws-timer-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); font-family:inherit; font-size:9px; letter-spacing:.5px; padding:4px 6px; cursor:pointer; }
@@ -590,8 +589,7 @@
       <div class="ws-header">
         <div class="lm-title">LM WORKSPACE</div>
         <div class="ws-timer-box">
-          <div class="ws-tank">
-            <div class="ws-tank-fill" id="ws-tank-fill" style="width:100%;"></div>
+          <div class="ws-tank" id="ws-tank">
             <div class="ws-timer-display" id="ws-timer-display">25:00</div>
           </div>
           <div class="ws-timer-controls">
@@ -1412,10 +1410,16 @@
   let wsTimerInterval = null;
   let wsTimerRunning = false;
   function wsFormatTime(s){ const m = Math.floor(s/60); const sec = s%60; return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0'); }
+  function wsLerpColor(hex1, hex2, t){
+    const a = hex1.match(/\w\w/g).map(x => parseInt(x, 16));
+    const b = hex2.match(/\w\w/g).map(x => parseInt(x, 16));
+    const rgb = a.map((v, i) => Math.round(v + (b[i] - v) * Math.max(0, Math.min(1, t))));
+    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  }
   function wsUpdateTimerDisplay(){
     document.getElementById('ws-timer-display').textContent = wsFormatTime(Math.max(0, wsTimerRemaining));
-    const pct = wsTimerTotal > 0 ? Math.max(0, Math.min(100, (wsTimerRemaining / wsTimerTotal) * 100)) : 0;
-    document.getElementById('ws-tank-fill').style.width = pct + '%';
+    const elapsedFrac = wsTimerTotal > 0 ? 1 - Math.max(0, Math.min(1, wsTimerRemaining / wsTimerTotal)) : 0;
+    document.getElementById('ws-tank').style.borderColor = wsLerpColor('#d99a2b', '#6f6f64', elapsedFrac);
   }
   function wsStartTimer(){
     if(wsTimerRunning) return;
