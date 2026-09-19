@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>LM Mathematics — Personal System</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ29sZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmQ5OGEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI0NSUiIHN0b3AtY29sb3I9IiNkOTlhMmIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGE1ZTE0Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDAsMTAwKSI+CiAgICA8Y2lyY2xlIHI9IjkwIiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iOCIvPgogICAgPHBhdGggZD0iTS01MCAyMiBMLTI2IC0zNyBMMCA2IEwyNiAtMzcgTDUwIDIyIFoiCiAgICAgICAgICBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwvZz4KPC9zdmc+Cg==">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -190,9 +191,9 @@
   .sec-note{ font-size:11.5px; color:var(--dim); line-height:1.7; margin-bottom:18px; max-width:640px; }
 
   /* ---- VAULT-style bordered panels ---- */
-  .panel{ border:1px solid var(--line); background:var(--panel); margin-bottom:20px; max-width:760px; }
-  .panel.panel-wide{ max-width:960px; }
-  .cal-columns{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; max-width:1200px; }
+  .panel{ border:1px solid var(--line); background:var(--panel); margin-bottom:20px; max-width:1180px; }
+  .panel.panel-wide{ max-width:1180px; }
+  .cal-columns{ display:flex; gap:20px; align-items:stretch; flex-wrap:wrap; max-width:1200px; }
   @media(max-width:820px){ .cal-columns > div{ min-width:0 !important; max-width:none !important; width:100%; } }
   .panel-head{
     display:flex; align-items:center; justify-content:space-between;
@@ -204,7 +205,7 @@
   .panel-body{ padding:18px; }
 
   /* ---- stat cards ---- */
-  .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); max-width:760px; }
+  .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); max-width:1180px; }
   .stat-card{ background:var(--panel); padding:14px 16px; }
   .stat-num{ font-size:22px; color:var(--amber-bright); line-height:1; font-family:inherit; }
   .stat-label{ font-size:10px; letter-spacing:1.5px; color:var(--dim); margin-top:8px; text-transform:uppercase; }
@@ -230,6 +231,10 @@
   .ws-header{ display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:20px; margin-bottom:26px; }
   .lm-title{ font-size:clamp(14px,1.6vw,19px); font-weight:300; color:var(--amber-bright); letter-spacing:3px; text-transform:uppercase; margin-bottom:14px; }
   .ws-header .lm-title{ margin-bottom:0; }
+  .lm-header{ margin-bottom:22px; max-width:1180px; }
+  .lm-kicker{ font-family:'Courier New',Consolas,monospace; letter-spacing:1.5px; font-size:10px; color:#89877a; text-transform:uppercase; }
+  .lm-heading{ font-family:Georgia,'Times New Roman',serif; font-weight:400; letter-spacing:1.5px; font-size:clamp(22px,3vw,32px); margin:8px 0 6px; color:#ece9dc; }
+  .lm-desc{ color:#89877a; font-size:12px; margin:0; line-height:1.6; max-width:760px; }
   .ws-timer-box{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; width:232px; flex-shrink:0; }
   .ws-tank{ position:relative; width:100%; height:26px; border:1px solid var(--amber); background:transparent; overflow:hidden; transition:border-color .4s linear; }
   .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; color:#fff; font-variant-numeric:tabular-nums; pointer-events:none; }
@@ -342,6 +347,17 @@
   .cal-swatch.today-swatch{ box-shadow:inset 0 0 0 1px var(--amber); }
   .cal-swatch.event-swatch{ border-left:2px solid var(--amber); background:rgba(255,255,255,0.04); }
   @media(max-width:650px){ .cal-cell{ min-height:56px; } .cal-chip{ display:none; } }
+  @media(min-width:821px){
+    #panel-calendar.active{ display:flex; flex-direction:column; overflow:hidden; padding-top:22px; padding-bottom:18px; }
+    #panel-calendar > .lm-header, #panel-calendar > .sec-title, #panel-calendar > .cal-form{ flex-shrink:0; }
+    #panel-calendar > .cal-columns{ flex:1; min-height:0; }
+    .cal-columns > .panel{ display:flex; flex-direction:column; height:100%; min-height:0; margin-bottom:0; }
+    .cal-panel-body{ flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:14px 18px; }
+    .cal-upcoming-body{ flex:1; min-height:0; overflow-y:auto; }
+    .cal-grid{ flex:1; min-height:0; grid-template-rows:auto; grid-auto-rows:1fr; overflow:hidden; }
+    .cal-top, .cal-legend{ flex-shrink:0; }
+    .cal-cell{ min-height:0; }
+  }
   .cal-event-row{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; }
   .cal-event-row:last-child{ border-bottom:none; }
   .cal-event-date{ width:88px; flex-shrink:0; color:var(--amber-bright); font-size:11px; }
@@ -569,7 +585,11 @@
 
     <!-- ---- OVERVIEW ---- -->
     <div class="tab-panel active" id="panel-overview">
-      <div class="lm-title">LM OVERVIEW</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // PERSONAL SYSTEM</div>
+        <div class="lm-heading">OVERVIEW</div>
+        <div class="lm-desc">Where you stand this semester — uploads, quiz average, and what's still missing.</div>
+      </div>
       <div class="sec-title">This Semester, So Far</div>
       <div class="stat-row" id="ov-stats"></div>
 
@@ -677,7 +697,11 @@
 
     <!-- ---- UPLOAD ---- -->
     <div class="tab-panel" id="panel-upload">
-      <div class="lm-title">LM UPLOAD</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // MATERIAL</div>
+        <div class="lm-heading">UPLOAD</div>
+        <div class="lm-desc">Add papers, notes, and tutorials — sorted by category as you go.</div>
+      </div>
       <div class="sec-note">Files upload to your account's storage and sync across devices. The gaps/quiz/similar-questions logic below still runs on placeholder data until a real embedding pipeline reads your uploads.</div>
       <div class="dropzone" id="dropzone">
         <div id="dropzone-label">drag files here, or click to browse</div>
@@ -693,7 +717,11 @@
 
     <!-- ---- QUICK QUIZ ---- -->
     <div class="tab-panel" id="panel-quiz">
-      <div class="lm-title">LM QUICK QUIZ</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // SELF-CHECK</div>
+        <div class="lm-heading">QUICK QUIZ</div>
+        <div class="lm-desc">Five questions to check where you actually stand right now.</div>
+      </div>
       <div class="sec-note">Sample questions below — once past papers are uploaded and processed, questions here will be drawn from your own material instead.</div>
       <div class="sec-title">Quick Quiz</div>
       <div class="quiz-card" id="quiz-card"></div>
@@ -701,7 +729,11 @@
 
     <!-- ---- SIMILAR QUESTIONS ---- -->
     <div class="tab-panel" id="panel-similar">
-      <div class="lm-title">LM SIMILAR QUESTIONS</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // PAST PAPERS</div>
+        <div class="lm-heading">SIMILAR QUESTIONS</div>
+        <div class="lm-desc">Find past-paper questions that resemble the one in front of you.</div>
+      </div>
       <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js — the same approach as the SNISS embedding workspace. The corpus below is still a small demo set standing in for your own uploaded past papers, until that upload pipeline is wired in.</div>
       <div class="sec-title">Similar Questions</div>
       <div class="sim-search">
@@ -713,7 +745,11 @@
 
     <!-- ---- SOLVING PATTERNS ---- -->
     <div class="tab-panel" id="panel-patterns">
-      <div class="lm-title">LM SOLVING PATTERNS</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // METHOD</div>
+        <div class="lm-heading">SOLVING PATTERNS</div>
+        <div class="lm-desc">Hand-written frameworks for the methods that come up again and again.</div>
+      </div>
       <div class="sec-note">Static, hand-written frameworks per method — not generated per problem, since a confidently wrong framework is worse than none.</div>
       <div class="sec-title">Solving Patterns</div>
       <div class="pattern-split">
@@ -724,7 +760,11 @@
 
     <!-- ---- AI LAB ---- -->
     <div class="tab-panel" id="panel-ailab">
-      <div class="lm-title">LM AI LAB</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // AI-ASSISTED</div>
+        <div class="lm-heading">AI LAB</div>
+        <div class="lm-desc">Ask a question about your module and get a research-style answer.</div>
+      </div>
       <div class="sec-note">Ask something about your module. Answers below are placeholder — until this is wired to a real model reading what you've uploaded, this is a demo of the interaction, not real research.</div>
       <div class="ai-prompt">
         <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
@@ -735,16 +775,24 @@
 
     <!-- ---- AI NOTES ---- -->
     <div class="tab-panel" id="panel-ainotes">
-      <div class="lm-title">LM AI NOTES</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // SAVED</div>
+        <div class="lm-heading">AI NOTES</div>
+        <div class="lm-desc">Everything you've saved from the AI Lab, kept in one place.</div>
+      </div>
       <div class="sec-note">Anything you save from the AI Lab lands here, so it's not lost in a scroll of past queries.</div>
       <div id="ainotes-list"></div>
     </div>
 
     <!-- ---- CALENDAR ---- -->
     <div class="tab-panel" id="panel-calendar">
-      <div class="lm-title">LM CALENDAR</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // SCHEDULE</div>
+        <div class="lm-heading">CALENDAR</div>
+        <div class="lm-desc">Log assessment dates and see what's coming up.</div>
+      </div>
       <div class="sec-title">Log an Assessment Date</div>
-      <div class="cal-form" style="max-width:960px;">
+      <div class="cal-form" style="max-width:1180px;">
         <input type="text" id="cal-name" placeholder="e.g. Semester Test 2">
         <input type="date" id="cal-date">
         <button class="go-btn" id="cal-add">ADD</button>
@@ -753,7 +801,7 @@
       <div class="cal-columns">
         <div class="panel" style="flex:1.7; min-width:420px; margin-bottom:0;">
           <div class="panel-head"><span class="panel-title">Calendar</span></div>
-          <div class="panel-body">
+          <div class="panel-body cal-panel-body">
             <div class="cal-top">
               <button class="cal-nav" id="cal-prev">&larr; PREV</button>
               <div class="cal-month" id="cal-month-label"></div>
@@ -768,16 +816,20 @@
           </div>
         </div>
 
-        <div class="panel" style="flex:1; min-width:260px; max-width:340px; margin-bottom:0;">
+        <div class="panel" style="flex:1; min-width:260px; max-width:360px; margin-bottom:0;">
           <div class="panel-head"><span class="panel-title">Upcoming</span></div>
-          <div class="panel-body" id="cal-list" style="max-height:520px; overflow-y:auto;"></div>
+          <div class="panel-body cal-upcoming-body" id="cal-list"></div>
         </div>
       </div>
     </div>
 
     <!-- ---- EXPLORE ---- -->
     <div class="tab-panel" id="panel-explore">
-      <div class="lm-title">LM EXPLORE</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // DID YOU KNOW</div>
+        <div class="lm-heading">EXPLORE</div>
+        <div class="lm-desc">A bit of mathematical trivia to break up the session.</div>
+      </div>
       <div class="explore-card">
         <div class="explore-eyebrow">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><path d="M10 15 21 6"/><path d="M18 3l3 3-3 3"/><path d="M14 10l1.5 1.5"/></svg>
@@ -791,7 +843,11 @@
 
     <!-- ---- PROGRESS ---- -->
     <div class="tab-panel" id="panel-progress">
-      <div class="lm-title">LM PROGRESS</div>
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // TRACK RECORD</div>
+        <div class="lm-heading">PROGRESS</div>
+        <div class="lm-desc">Quiz scores over time, and what you've uploaded, by category.</div>
+      </div>
       <div class="panel">
         <div class="panel-head"><span class="panel-title">Quiz Scores Over Time</span></div>
         <div class="panel-body" id="prog-chart-wrap"></div>
