@@ -541,7 +541,7 @@
 
     <!-- ---- SIMILAR QUESTIONS ---- -->
     <div class="tab-panel" id="panel-similar">
-      <div class="sec-note">Demo dataset below, matched by simple keyword overlap — not a real embedding model yet. This is standing in for what "you have a similar question in the 2020 paper" will actually do once wired to your uploaded papers.</div>
+      <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js — the same approach as the SNISS embedding workspace. The corpus below is still a small demo set standing in for your own uploaded past papers, until that upload pipeline is wired in.</div>
       <div class="sec-title">Similar Questions</div>
       <div class="sim-search">
         <input id="sim-input" type="text" placeholder="paste or type a question...">
@@ -1128,7 +1128,11 @@
     }));
   }
 
-  // ============ SIMILAR QUESTIONS ============
+  // ============ SIMILAR QUESTIONS — real embedding model ============
+  // Client-side sentence embeddings via transformers.js (MiniLM), no server needed —
+  // same pattern as the SNISS embedding workspace. The SIM_BANK corpus below stands
+  // in for real uploaded past papers until that pipeline exists; everything past
+  // computing the embeddings themselves already works with real data, not fake data.
   const SIM_BANK = [
     { src:'2020 Past Paper, Q4', text:'Find the derivative of f(x) = x³ - 2x² + 5x using first principles.' },
     { src:'2021 Past Paper, Q2', text:'Use implicit differentiation to find dy/dx for x² + y² = 25.' },
@@ -1137,26 +1141,66 @@
     { src:'2020 Past Paper, Q7', text:'State and apply the Mean Value Theorem for f(x) = x² on [0,2].' },
     { src:'2023 Past Paper, Q3', text:'Find the derivative of ln(x² + 1).' }
   ];
-  function simScore(query, text){
-    const qw = new Set(query.toLowerCase().match(/[a-z0-9²³]+/g) || []);
-    const tw = new Set(text.toLowerCase().match(/[a-z0-9²³]+/g) || []);
-    if(!qw.size || !tw.size) return 0;
-    let overlap = 0; qw.forEach(w => { if(tw.has(w)) overlap++; });
-    return overlap / Math.max(qw.size, 1);
+  const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+  let embedderPromise = null;
+  let simEmbeddingsPromise = null;
+
+  function getEmbedder(){
+    if(!embedderPromise){
+      embedderPromise = (async () => {
+        const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        return pipeline('feature-extraction', EMBEDDING_MODEL);
+      })();
+    }
+    return embedderPromise;
   }
+  async function embedText(text){
+    const embed = await getEmbedder();
+    const output = await embed(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data);
+  }
+  function ensureSimBankEmbedded(){
+    if(!simEmbeddingsPromise){
+      simEmbeddingsPromise = Promise.all(SIM_BANK.map(async item => {
+        item.embedding = await embedText(item.text);
+      }));
+    }
+    return simEmbeddingsPromise;
+  }
+  function dotProduct(a, b){
+    let sum = 0;
+    for(let i = 0; i < a.length; i++) sum += a[i] * b[i];
+    return sum;
+  }
+
   function renderSimilar(){
     document.getElementById('sim-results').innerHTML = '<div class="empty-note">type a question above and press search</div>';
   }
-  document.getElementById('sim-go').addEventListener('click', () => {
+  document.getElementById('sim-go').addEventListener('click', async () => {
     const q = document.getElementById('sim-input').value.trim();
     const wrap = document.getElementById('sim-results');
+    const goBtn = document.getElementById('sim-go');
     if(!q){ wrap.innerHTML = '<div class="empty-note">type a question first</div>'; return; }
-    const ranked = SIM_BANK.map(s => Object.assign({}, s, { score: simScore(q, s.text) })).sort((a,b) => b.score - a.score).slice(0,3);
-    wrap.innerHTML = ranked.map(r => `
-      <div class="sim-result">
-        <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score*100)}% overlap</span></div>
-        <div class="sim-text">${escapeHtml(r.text)}</div>
-      </div>`).join('');
+    const firstLoad = !simEmbeddingsPromise;
+    goBtn.disabled = true;
+    wrap.innerHTML = `<div class="empty-note">${firstLoad ? 'loading the embedding model (first search only, ~10–30s)…' : 'searching…'}</div>`;
+    try{
+      await ensureSimBankEmbedded();
+      const qEmbedding = await embedText(q);
+      const ranked = SIM_BANK
+        .map(s => ({ src: s.src, text: s.text, score: dotProduct(qEmbedding, s.embedding) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+      wrap.innerHTML = ranked.map(r => `
+        <div class="sim-result">
+          <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% match</span></div>
+          <div class="sim-text">${escapeHtml(r.text)}</div>
+        </div>`).join('');
+    }catch(e){
+      console.error('similarity search failed', e);
+      wrap.innerHTML = '<div class="empty-note">could not load the similarity model — check your connection and try again</div>';
+    }
+    goBtn.disabled = false;
   });
   document.getElementById('sim-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('sim-go').click(); });
 
