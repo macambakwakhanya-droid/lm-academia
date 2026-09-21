@@ -453,6 +453,7 @@
       <a class="back-link" id="landing-forgot" style="margin-top:0;">forgot password</a>
     </div>
     <div class="foot-msg" style="margin-top:14px;">new here? <a id="landing-start-setup">start setup</a></div>
+    <div class="foot-msg" style="margin-top:14px;"><a id="landing-preview-dash">preview the dashboard &rarr;</a></div>
   </div>
   <div class="legal">
     <div class="legal-brand">
@@ -1002,11 +1003,9 @@
   }
 
   // ============================================================
-  // FIRST-VISIT GATING — Welcome only ever shows once per device.
-  // There's no account yet to check at this point, so a local flag
-  // is the only signal available: unset → this device has never
-  // finished setup, so show Welcome first. Set → skip straight to
-  // the sign-in (Access Terminal) page.
+  // LANDING — Access Terminal (page-landing) is always what this app
+  // loads on. New users can click "start setup" to go through Welcome →
+  // account creation manually; nothing auto-redirects them there anymore.
   // ============================================================
   const SETUP_FLAG_KEY = 'lm_math_setup_complete_v1';
   function hasCompletedSetupBefore(){
@@ -1015,10 +1014,6 @@
   }
   function markSetupComplete(){
     try{ localStorage.setItem(SETUP_FLAG_KEY, '1'); }catch(e){}
-  }
-  if(!hasCompletedSetupBefore()){
-    document.getElementById('page-landing').classList.remove('visible');
-    openPage('page-welcome');
   }
 
   // ---- overlays (About / Terms / Privacy) — generic open/close ----
@@ -1085,6 +1080,14 @@
     }
   });
   document.getElementById('landing-start-setup').addEventListener('click', () => openPage('page-welcome'));
+  document.getElementById('landing-preview-dash').addEventListener('click', () => {
+    // Dev/preview shortcut only — skips real sign-in so the dashboard can be
+    // reviewed without a Firebase account. Store stays empty (no attached
+    // listeners) until someone actually signs in for real.
+    document.getElementById('dash-user').textContent = 'Preview mode';
+    openPage('page-dashboard');
+    renderOverview();
+  });
 
   // ---- page 2: welcome (orientation for brand-new devices) ----
   document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
