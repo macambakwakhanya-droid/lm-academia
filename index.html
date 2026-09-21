@@ -453,7 +453,6 @@
       <a class="back-link" id="landing-forgot" style="margin-top:0;">forgot password</a>
     </div>
     <div class="foot-msg" style="margin-top:14px;">new here? <a id="landing-start-setup">start setup</a></div>
-   
   </div>
   <div class="legal">
     <div class="legal-brand">
@@ -494,6 +493,7 @@
       nothing further to configure on your end.
     </div>
     <button class="go-btn" id="welcome-go">CONTINUE</button>
+    <div><a class="back-link" id="welcome-back">&larr; back</a></div>
   </div>
   <div class="legal">
     <div class="legal-brand">
@@ -1080,17 +1080,10 @@
     }
   });
   document.getElementById('landing-start-setup').addEventListener('click', () => openPage('page-welcome'));
-  document.getElementById('landing-preview-dash').addEventListener('click', () => {
-    // Dev/preview shortcut only — skips real sign-in so the dashboard can be
-    // reviewed without a Firebase account. Store stays empty (no attached
-    // listeners) until someone actually signs in for real.
-    document.getElementById('dash-user').textContent = 'Preview mode';
-    openPage('page-dashboard');
-    renderOverview();
-  });
 
   // ---- page 2: welcome (orientation for brand-new devices) ----
   document.getElementById('welcome-go').addEventListener('click', () => openPage('page-info'));
+  document.getElementById('welcome-back').addEventListener('click', () => openPage('page-landing'));
 
   // ---- page 3: set up your account (login details + about you → creates the account) ----
   const infoEmail = document.getElementById('info-email');
