@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>LM Mathematics — Personal System</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ29sZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmQ5OGEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI0NSUiIHN0b3AtY29sb3I9IiNkOTlhMmIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGE1ZTE0Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDAsMTAwKSI+CiAgICA8Y2lyY2xlIHI9IjkwIiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iOCIvPgogICAgPHBhdGggZD0iTS01MCAyMiBMLTI2IC0zNyBMMCA2IEwyNiAtMzcgTDUwIDIyIFoiCiAgICAgICAgICBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwvZz4KPC9zdmc+Cg==">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -235,11 +236,16 @@
   .lm-kicker{ font-family:'Courier New',Consolas,monospace; letter-spacing:1.5px; font-size:10px; color:#89877a; text-transform:uppercase; }
   .lm-heading{ font-family:Georgia,'Times New Roman',serif; font-weight:400; letter-spacing:1.5px; font-size:clamp(22px,3vw,32px); margin:8px 0 6px; color:#ece9dc; }
   .lm-desc{ color:#89877a; font-size:12px; margin:0; line-height:1.6; max-width:760px; }
-  .ws-timer-box{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; width:232px; flex-shrink:0; }
+  .ws-timer-box{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; width:250px; flex-shrink:0; }
   .ws-tank{ position:relative; width:100%; height:26px; border:1px solid var(--amber); background:transparent; overflow:hidden; transition:border-color .4s linear; }
   .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; color:#fff; font-variant-numeric:tabular-nums; pointer-events:none; }
   .ws-timer-controls{ display:flex; gap:4px; justify-content:flex-end; flex-wrap:nowrap; width:100%; }
-  .ws-timer-controls input{ width:32px; flex-shrink:0; background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:10px; padding:4px 3px; text-align:center; }
+  .ws-timer-controls input{ width:38px; flex-shrink:0; background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:12px; padding:5px 2px; text-align:center; -moz-appearance:textfield; }
+  .ws-timer-controls input::-webkit-outer-spin-button, .ws-timer-controls input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .ws-timer-stepper{ display:flex; align-items:stretch; border:1px solid var(--line); flex-shrink:0; }
+  .ws-timer-stepper input{ border:none; border-left:1px solid var(--line); border-right:1px solid var(--line); }
+  .ws-timer-stepbtn{ background:transparent; border:none; color:var(--dim); font-family:inherit; font-size:11px; padding:0 7px; cursor:pointer; }
+  .ws-timer-stepbtn:hover{ color:var(--amber-bright); background:rgba(217,154,43,0.08); }
   .ws-timer-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); font-family:inherit; font-size:8.5px; letter-spacing:.3px; padding:4px 5px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
   .ws-timer-btn:hover{ border-color:var(--amber); color:var(--amber-bright); }
   .ws-selectors{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:22px; }
@@ -252,6 +258,14 @@
   .ws-paper .wp-text{ font-size:14px; line-height:1.7; }
   .ws-unavailable{ border:1px dashed var(--line); padding:24px; text-align:center; color:var(--dim); font-size:12.5px; margin-bottom:18px; }
   .ws-empty{ border:1px dashed var(--line); padding:24px; text-align:center; color:var(--dim); font-size:12.5px; margin-bottom:18px; }
+  .ws-grab{ border:1px solid var(--line); background:#161611; margin-bottom:18px; }
+  .ws-grab-toolbar{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .ws-grab-toolbar span{ font-size:10.5px; color:var(--dim); }
+  .ws-grab-viewport{ position:relative; overflow:auto; max-height:520px; background:#0a0a0a; touch-action:none; }
+  .ws-grab-viewport canvas{ display:block; cursor:crosshair; }
+  .ws-grab-selection{ position:absolute; left:0; top:0; width:0; height:0; border:2px dashed var(--amber-bright); background:rgba(255,183,3,0.12); display:none; pointer-events:none; }
+  .ws-paper-shot{ background:#f4f1ea; border-radius:2px; padding:18px; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.35); margin-bottom:18px; }
+  .ws-paper-shot img{ max-width:100%; display:block; margin:0 auto 12px; box-shadow:0 2px 10px rgba(0,0,0,0.25); }
   .ws-body{ display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; max-width:1040px; }
   @media(max-width:900px){ .ws-body{ grid-template-columns:1fr; } }
   .ws-attempt{ border:1px solid var(--line); background:var(--panel); }
@@ -602,7 +616,11 @@
             <div class="ws-timer-display" id="ws-timer-display">25:00</div>
           </div>
           <div class="ws-timer-controls">
-            <input type="number" id="ws-timer-input" value="25" min="1" max="180">
+            <div class="ws-timer-stepper">
+              <button class="ws-timer-stepbtn" id="ws-timer-dec" type="button">&minus;</button>
+              <input type="number" id="ws-timer-input" value="25" min="1" max="180">
+              <button class="ws-timer-stepbtn" id="ws-timer-inc" type="button">+</button>
+            </div>
             <button class="ws-timer-btn" id="ws-timer-start">START</button>
             <button class="ws-timer-btn" id="ws-timer-pause">PAUSE</button>
             <button class="ws-timer-btn" id="ws-timer-reset">RESET</button>
@@ -611,33 +629,15 @@
       </div>
 
       <div class="ws-selectors">
-        <div class="ws-select-group">
-          <label>TYPE</label>
-          <select class="ws-select" id="ws-type">
-            <option value="">Select type</option>
-            <option value="Past Paper">Past Paper</option>
-            <option value="Tutorial">Tutorial</option>
-            <option value="Quiz">Quiz</option>
-          </select>
-        </div>
-        <div class="ws-select-group">
-          <label>YEAR</label>
-          <select class="ws-select" id="ws-year">
-            <option value="">Select year</option>
-            <option>2019</option><option>2020</option><option>2021</option><option>2022</option><option>2023</option>
-          </select>
-        </div>
-        <div class="ws-select-group" style="margin-left:auto;">
-          <label>QUESTION</label>
-          <select class="ws-select" id="ws-question">
-            <option value="">Select question</option>
-            <option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option>
-            <option value="5">Q5</option><option value="6">Q6</option><option value="7">Q7</option><option value="8">Q8</option>
+        <div class="ws-select-group" style="flex:1; max-width:460px;">
+          <label>PAPER</label>
+          <select class="ws-select" id="ws-paper" style="width:100%;">
+            <option value="">Select an uploaded paper</option>
           </select>
         </div>
       </div>
 
-      <div id="ws-question-display"><div class="ws-empty">choose a type, year, and question above to load it</div></div>
+      <div id="ws-question-display"><div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div></div>
 
       <div class="ws-body">
         <div>
@@ -933,6 +933,11 @@
 </div>
 
 <script>
+  // pdf.js worker (needed for rendering uploaded PDF papers in the Workspace tab)
+  if(window['pdfjsLib']){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
   // ============================================================
   // FIREBASE CONFIG — same Firebase project as VAULT (leomacamba-ef46b).
   // The tracker's Firestore collections are all prefixed `tracker_`
@@ -1439,15 +1444,6 @@
   // embedding model + SIM_BANK corpus as the Similar Questions tab — not a separate
   // fake. "View Answer" / "View AI's Take" are placeholders until an answer-key
   // pipeline and the AI Lab backend exist.
-  const WORKSPACE_BANK = [
-    { type:'Past Paper', year:2020, q:4, text:'Find the derivative of f(x) = x³ - 2x² + 5x using first principles.' },
-    { type:'Past Paper', year:2021, q:2, text:'Use implicit differentiation to find dy/dx for x² + y² = 25.' },
-    { type:'Past Paper', year:2019, q:6, text:'A ladder 5m long slides down a wall. Find the rate at which the base moves when the top is 3m up.' },
-    { type:'Tutorial', year:2022, q:1, text:'Evaluate ∫x·eˣ dx using integration by parts.' },
-    { type:'Past Paper', year:2020, q:7, text:'State and apply the Mean Value Theorem for f(x) = x² on [0,2].' },
-    { type:'Past Paper', year:2023, q:3, text:'Find the derivative of ln(x² + 1).' }
-  ];
-
   let wsTimerRemaining = 25 * 60;
   let wsTimerTotal = 25 * 60;
   let wsTimerInterval = null;
@@ -1484,6 +1480,17 @@
   document.getElementById('ws-timer-start').addEventListener('click', wsStartTimer);
   document.getElementById('ws-timer-pause').addEventListener('click', wsPauseTimer);
   document.getElementById('ws-timer-reset').addEventListener('click', wsResetTimer);
+  document.getElementById('ws-timer-dec').addEventListener('click', () => {
+    const input = document.getElementById('ws-timer-input');
+    input.value = Math.max(1, (Number(input.value) || 25) - 1);
+    wsResetTimer();
+  });
+  document.getElementById('ws-timer-inc').addEventListener('click', () => {
+    const input = document.getElementById('ws-timer-input');
+    input.value = Math.min(180, (Number(input.value) || 25) + 1);
+    wsResetTimer();
+  });
+  document.getElementById('ws-timer-input').addEventListener('change', wsResetTimer);
 
   function matchSolvingPattern(text){
     const lower = text.toLowerCase();
@@ -1568,7 +1575,7 @@
     wsLastX = p.x; wsLastY = p.y;
     wsCtx.globalCompositeOperation = wsErasing ? 'destination-out' : 'source-over';
     wsCtx.strokeStyle = wsDrawColor;
-    wsCtx.lineWidth = wsBrushSize;
+    wsCtx.lineWidth = wsErasing ? Math.max(24, wsBrushSize * 4) : wsBrushSize;
     // draw a dot so a single tap/click still leaves a mark
     wsCtx.beginPath();
     wsCtx.moveTo(p.x, p.y);
@@ -1585,7 +1592,10 @@
     wsCtx.stroke();
     wsLastX = p.x; wsLastY = p.y;
   });
-  ['pointerup','pointercancel'].forEach(evt => wsCanvas.addEventListener(evt, () => { wsDrawing = false; }));
+  ['pointerup','pointercancel'].forEach(evt => wsCanvas.addEventListener(evt, () => {
+    wsDrawing = false;
+    wsCtx.globalCompositeOperation = 'source-over';
+  }));
 
   document.querySelectorAll('.ws-color-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1615,45 +1625,209 @@
   document.getElementById('ws-zoom-out').addEventListener('click', () => { wsZoom = Math.max(0.25, +(wsZoom - 0.1).toFixed(2)); wsApplyZoom(); });
   wsApplyZoom();
 
-  function wsCheckSelection(){
-    const type = document.getElementById('ws-type').value;
-    const year = document.getElementById('ws-year').value;
-    const q = document.getElementById('ws-question').value;
+  function wsResetQuestionDisplay(){
+    document.getElementById('ws-question-display').innerHTML = '<div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div>';
+    wsSetPattern(null);
+    document.getElementById('ws-pattern-box').innerHTML = '<span class="empty-note" style="padding:0;">no framework yet — this needs text, and a grabbed segment is just an image until a transcription step is wired up</span>';
+    document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">same here — similar-question matching needs text, not just the image</span>';
+  }
+
+  function wsPopulatePaperSelect(){
+    const sel = document.getElementById('ws-paper');
+    if(!sel) return;
+    const prev = sel.value;
+    const byCat = {};
+    (store.papers || []).forEach(p => { (byCat[p.category] = byCat[p.category] || []).push(p); });
+    let html = '<option value="">Select an uploaded paper</option>';
+    Object.keys(byCat).forEach(cat => {
+      html += `<optgroup label="${escapeHtml(cat)}">`;
+      byCat[cat].forEach(p => { html += `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`; });
+      html += '</optgroup>';
+    });
+    sel.innerHTML = html;
+    if(prev && (store.papers || []).some(p => p.id === prev)) sel.value = prev;
+  }
+
+  let wsGrabPdf = null;
+  let wsGrabPageNum = 1;
+  let wsGrabSel = null; // { x, y, w, h } in the rendered canvas's own pixel coordinates
+
+  async function wsOpenGrabTool(paper){
     const displayEl = document.getElementById('ws-question-display');
+    const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
+    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null;
+    wsSetPattern(null);
+    document.getElementById('ws-pattern-box').innerHTML = '<span class="empty-note" style="padding:0;">grab a segment, then use it, to see a matching framework here</span>';
+    document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">grab a segment, then use it, to see a similar problem here</span>';
+
+    displayEl.innerHTML = `
+      <div class="ws-grab">
+        <div class="ws-grab-toolbar">
+          <button class="ws-canvas-btn" id="ws-grab-prev" ${isPdf ? '' : 'style="display:none;"'}>&larr; PAGE</button>
+          <span id="ws-grab-page-label">${isPdf ? 'loading\u2026' : escapeHtml(paper.name)}</span>
+          <button class="ws-canvas-btn" id="ws-grab-next" ${isPdf ? '' : 'style="display:none;"'}>PAGE &rarr;</button>
+          <span style="margin-left:auto;">drag on the page below to select the segment you want to work on</span>
+          <button class="go-btn" id="ws-grab-use">USE THIS SEGMENT</button>
+        </div>
+        <div class="ws-grab-viewport" id="ws-grab-viewport">
+          <canvas id="ws-grab-canvas"></canvas>
+          <div class="ws-grab-selection" id="ws-grab-selection"></div>
+        </div>
+      </div>`;
+
+    if(isPdf){
+      if(!window['pdfjsLib']){
+        document.getElementById('ws-grab-page-label').textContent = 'PDF viewer failed to load — check your connection and reopen this paper';
+      } else {
+        try{
+          wsGrabPdf = await pdfjsLib.getDocument(paper.file_url).promise;
+          await wsRenderGrabPage();
+        }catch(e){
+          document.getElementById('ws-grab-page-label').textContent = 'Could not load this PDF: ' + e.message;
+        }
+      }
+    } else {
+      await wsRenderGrabImage(paper.file_url);
+    }
+
+    wsBindGrabSelection();
+    document.getElementById('ws-grab-prev').addEventListener('click', () => wsGrabChangePage(-1));
+    document.getElementById('ws-grab-next').addEventListener('click', () => wsGrabChangePage(1));
+    document.getElementById('ws-grab-use').addEventListener('click', wsUseGrabSelection);
+  }
+
+  async function wsRenderGrabPage(){
+    const page = await wsGrabPdf.getPage(wsGrabPageNum);
+    const viewport = page.getViewport({ scale: 1.6 });
+    const canvas = document.getElementById('ws-grab-canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    document.getElementById('ws-grab-page-label').textContent = `Page ${wsGrabPageNum} / ${wsGrabPdf.numPages}`;
+    wsGrabSel = null;
+    const box = document.getElementById('ws-grab-selection');
+    if(box) box.style.display = 'none';
+  }
+
+  function wsGrabChangePage(delta){
+    if(!wsGrabPdf) return;
+    const next = wsGrabPageNum + delta;
+    if(next < 1 || next > wsGrabPdf.numPages) return;
+    wsGrabPageNum = next;
+    wsRenderGrabPage();
+  }
+
+  function wsRenderGrabImage(url){
+    return new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.getElementById('ws-grab-canvas');
+        if(!canvas){ resolve(); return; }
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve();
+      };
+      img.onerror = () => {
+        const label = document.getElementById('ws-grab-page-label');
+        if(label) label.textContent = 'Could not load this file';
+        resolve();
+      };
+      img.src = url;
+    });
+  }
+
+  function wsBindGrabSelection(){
+    const canvas = document.getElementById('ws-grab-canvas');
+    const box = document.getElementById('ws-grab-selection');
+    if(!canvas || !box) return;
+    let dragging = false, startX = 0, startY = 0;
+
+    function toCanvasCoords(clientX, clientY){
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: Math.max(0, Math.min(canvas.width, (clientX - rect.left) * scaleX)),
+        y: Math.max(0, Math.min(canvas.height, (clientY - rect.top) * scaleY))
+      };
+    }
+    function paintBox(){
+      if(!wsGrabSel) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      box.style.display = 'block';
+      box.style.left = (wsGrabSel.x * scaleX) + 'px';
+      box.style.top = (wsGrabSel.y * scaleY) + 'px';
+      box.style.width = (wsGrabSel.w * scaleX) + 'px';
+      box.style.height = (wsGrabSel.h * scaleY) + 'px';
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      dragging = true;
+      const p = toCanvasCoords(e.clientX, e.clientY);
+      startX = p.x; startY = p.y;
+      wsGrabSel = { x: startX, y: startY, w: 0, h: 0 };
+      paintBox();
+    });
+    canvas.addEventListener('pointermove', e => {
+      if(!dragging) return;
+      const p = toCanvasCoords(e.clientX, e.clientY);
+      wsGrabSel = { x: Math.min(startX, p.x), y: Math.min(startY, p.y), w: Math.abs(p.x - startX), h: Math.abs(p.y - startY) };
+      paintBox();
+    });
+    ['pointerup','pointercancel'].forEach(evt => canvas.addEventListener(evt, () => { dragging = false; }));
+  }
+
+  function wsUseGrabSelection(){
+    const canvas = document.getElementById('ws-grab-canvas');
+    if(!canvas || !wsGrabSel || wsGrabSel.w < 8 || wsGrabSel.h < 8){
+      alert('Drag a rectangle over the part of the paper you want to work on first.');
+      return;
+    }
+    const crop = document.createElement('canvas');
+    crop.width = Math.round(wsGrabSel.w);
+    crop.height = Math.round(wsGrabSel.h);
+    crop.getContext('2d').drawImage(canvas, wsGrabSel.x, wsGrabSel.y, wsGrabSel.w, wsGrabSel.h, 0, 0, crop.width, crop.height);
+    const dataUrl = crop.toDataURL('image/png');
+    document.getElementById('ws-question-display').innerHTML = `
+      <div class="ws-paper-shot">
+        <img src="${dataUrl}" alt="question segment">
+        <button class="ws-canvas-btn" id="ws-grab-again">GRAB A DIFFERENT SEGMENT</button>
+      </div>`;
+    document.getElementById('ws-grab-again').addEventListener('click', () => {
+      const paperId = document.getElementById('ws-paper').value;
+      const paper = (store.papers || []).find(p => p.id === paperId);
+      if(paper) wsOpenGrabTool(paper);
+    });
     document.getElementById('ws-reveal-area').innerHTML = '';
     wsClearCanvas(false);
     wsUndoStack = [];
-    if(!type || !year || !q){
-      displayEl.innerHTML = '<div class="ws-empty">choose a type, year, and question above to load it</div>';
-      wsSetPattern(null);
-      document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">load a question to see a similar one</span>';
-      return;
-    }
-    const match = WORKSPACE_BANK.find(w => w.type === type && String(w.year) === year && String(w.q) === q);
-    if(!match){
-      displayEl.innerHTML = '<div class="ws-unavailable">This question is unavailable.</div>';
-      wsSetPattern(null);
-      document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">load a question to see a similar one</span>';
-      return;
-    }
-    displayEl.innerHTML = `
-      <div class="ws-paper">
-        <div class="wp-tag">${escapeHtml(match.type)} · ${escapeHtml(String(match.year))} · Question ${escapeHtml(String(match.q))}</div>
-        <div class="wp-text">${escapeHtml(match.text)}</div>
-      </div>`;
-    wsSetPattern(matchSolvingPattern(match.text));
-    wsLoadSuggestion(match);
+    // No OCR/transcription step yet, so pattern-matching and similar-question
+    // suggestions stay unavailable for a grabbed image until that's wired up.
   }
-  document.getElementById('ws-type').addEventListener('change', wsCheckSelection);
-  document.getElementById('ws-year').addEventListener('change', wsCheckSelection);
-  document.getElementById('ws-question').addEventListener('change', wsCheckSelection);
+
+  document.getElementById('ws-paper').addEventListener('change', e => {
+    const id = e.target.value;
+    document.getElementById('ws-reveal-area').innerHTML = '';
+    wsClearCanvas(false);
+    wsUndoStack = [];
+    if(!id){ wsResetQuestionDisplay(); return; }
+    const paper = (store.papers || []).find(p => p.id === id);
+    if(!paper){ wsResetQuestionDisplay(); return; }
+    wsOpenGrabTool(paper);
+  });
   document.getElementById('ws-view-answer').addEventListener('click', () => {
     document.getElementById('ws-reveal-area').innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER</div>Once an answer-key pipeline is wired up, the worked solution for this question will appear here — for now this is a placeholder.</div>`;
   });
   document.getElementById('ws-view-ai').addEventListener('click', () => {
     document.getElementById('ws-reveal-area').innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Once the AI Lab is wired to a real model, its read on your attempt will appear here — for now this is a placeholder.</div>`;
   });
-  function renderWorkspace(){ wsUpdateTimerDisplay(); }
+  function renderWorkspace(){ wsUpdateTimerDisplay(); wsPopulatePaperSelect(); }
 
   // ============ AI LAB / AI NOTES ============
   function fakeAiAnswer(q){
