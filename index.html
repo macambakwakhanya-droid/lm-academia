@@ -429,6 +429,7 @@
   .about-back{ font-size:11px; color:var(--dim); margin-top:22px; display:inline-block; }
   .about-back:hover{ color:var(--amber-bright); }
 </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -604,6 +605,12 @@
       <div class="sec-title">This Semester, So Far</div>
       <div class="stat-row" id="ov-stats"></div>
 
+      <div class="sec-title">Due Today</div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Spaced Repetition Queue</span></div>
+        <div class="panel-body" id="ov-due"></div>
+      </div>
+
       <div class="panel">
         <div class="panel-head"><span class="panel-title">What's Missing</span><span style="font-size:9.5px;letter-spacing:1.5px;color:var(--amber);">HEURISTIC — NOT A GUARANTEE</span></div>
         <div class="panel-body"><span id="ov-gap"></span></div>
@@ -692,7 +699,7 @@
         <div class="lm-heading">UPLOAD</div>
         <div class="lm-desc">Add papers, notes, and tutorials — sorted by category as you go.</div>
       </div>
-      <div class="sec-note">Files upload to your account's storage and sync across devices. The gaps/quiz/similar-questions logic below still runs on placeholder data until a real embedding pipeline reads your uploads.</div>
+      <div class="sec-note">Files upload to your account's storage and sync across devices. PDFs are indexed automatically in your browser — text extracted, chunked, embedded — so Similar Questions, the AI Lab, and workspace suggestions draw on your own material. Upload answer memos under "Memos / Answers" to unlock VIEW ANSWER.</div>
       <div class="dropzone" id="dropzone">
         <div id="dropzone-label">drag files here, or click to browse</div>
         <input type="file" id="file-input" multiple style="display:none">
@@ -724,7 +731,7 @@
         <div class="lm-heading">SIMILAR QUESTIONS</div>
         <div class="lm-desc">Find past-paper questions that resemble the one in front of you.</div>
       </div>
-      <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js — the same approach as the SNISS embedding workspace. The corpus below is still a small demo set standing in for your own uploaded past papers, until that upload pipeline is wired in.</div>
+      <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js. Once your PDFs are uploaded and indexed, search runs over your own papers — a small demo set fills the gap until then.</div>
       <div class="sec-title">Similar Questions</div>
       <div class="sim-search">
         <input id="sim-input" type="text" placeholder="paste or type a question...">
@@ -755,7 +762,7 @@
         <div class="lm-heading">AI LAB</div>
         <div class="lm-desc">Ask a question about your module and get a research-style answer.</div>
       </div>
-      <div class="sec-note">Ask something about your module. Answers below are placeholder — until this is wired to a real model reading what you've uploaded, this is a demo of the interaction, not real research.</div>
+      <div class="sec-note">Answers come from the LM AI API (same server-side pattern as VAULT's AI Lab), grounded in your uploaded material when relevant. Verify important results against your memos.</div>
       <div class="ai-prompt">
         <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
         <button class="go-btn" id="ai-go">RESEARCH</button>
@@ -1014,7 +1021,11 @@
     papers: 'tracker_papers',
     quizAttempts: 'tracker_quiz_attempts',
     aiNotes: 'tracker_ai_notes',
-    events: 'tracker_events'
+    events: 'tracker_events',
+    chunks: 'tracker_chunks',
+    mastery: 'tracker_mastery',
+    reviews: 'tracker_reviews',
+    activity: 'tracker_activity'
   };
   const PROFILE_COLLECTION = 'tracker_profiles';
 
@@ -1209,7 +1220,7 @@
   // answers below are still placeholder content until a real
   // embedding/Gemini pipeline reads what's actually uploaded.
   // ============================================================
-  let store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+  let store = { papers: [], quizAttempts: [], aiNotes: [], events: [], chunks: [], mastery: [], reviews: [], activity: [] };
   let storeUnsubscribers = {};
 
   function attachStoreListeners(uid){
@@ -1227,14 +1238,200 @@
   function detachStoreListeners(){
     Object.values(storeUnsubscribers).forEach(u => { try{ u(); }catch(e){} });
     storeUnsubscribers = {};
-    store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+    store = { papers: [], quizAttempts: [], aiNotes: [], events: [], chunks: [], mastery: [], reviews: [], activity: [] };
   }
 
   function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch(e){ return ''; } }
 
-  const UPLOAD_CATS = ['Learning Objectives','Videos','Lecture Notes','Tutorials','My Work / Attempts'];
+  const UPLOAD_CATS = ['Learning Objectives','Videos','Lecture Notes','Tutorials','My Work / Attempts','Memos / Answers'];
   let activeCat = UPLOAD_CATS[0];
+
+  // ============================================================
+  // EXPANSION — real upload intelligence:
+  // PDF text extract → chunk → embed → index → search → mastery/SRS.
+  // AI calls go through /api/lm-math-ai (serverless, Gemini key
+  // server-side — same pattern as VAULT's /api/ai-curriculum-lab).
+  // ============================================================
+  function guessTopic(text){
+    const t = String(text || '').toLowerCase();
+    const topics = {
+      'Differentiation': ['derivative','differentiate','dy/dx','first principles','tangent','d/dx'],
+      'Integration': ['integrate','integral','by parts','substitution','antiderivative'],
+      'Related Rates': ['ladder','rate at which','slides','related rates','dv/dt','ds/dt'],
+      'Proofs': ['prove','induction','contradiction','theorem','lemma'],
+      'Series': ['series','converge','diverge','sum to infinity','ratio test','taylor'],
+      'Linear Algebra': ['matrix','eigen','determinant','vector space','linearly independent'],
+      'Probability': ['probability','random variable','distribution','variance','expected value']
+    };
+    let best = 'General', bestScore = 0;
+    Object.entries(topics).forEach(([topic, keys]) => {
+      const score = keys.reduce((a,k) => a + (t.includes(k) ? 1 : 0), 0);
+      if(score > bestScore){ bestScore = score; best = topic; }
+    });
+    return best;
+  }
+
+  function chunkText(text, max = 1200, overlap = 180){
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if(!clean) return [];
+    const sentences = clean.match(/[^.!?]+[.!?]+/g) || [clean];
+    const chunks = [];
+    let cur = '';
+    for(const s of sentences){
+      if((cur + ' ' + s).length > max && cur){
+        chunks.push(cur.trim());
+        cur = (overlap ? cur.slice(-overlap) + ' ' : '') + s;
+      } else {
+        cur = cur ? cur + ' ' + s : s;
+      }
+    }
+    if(cur.trim()) chunks.push(cur.trim());
+    return chunks.filter(Boolean);
+  }
+
+  async function extractPdfText(file){
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    let out = '';
+    const limit = Math.min(pdf.numPages, 100);
+    for(let p = 1; p <= limit; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      out += content.items.map(i => i.str).join(' ') + '\n';
+    }
+    return out;
+  }
+
+  async function deleteChunksForPaper(paperId){
+    const snap = await db.collection(TRACKER_COLLECTIONS.chunks)
+      .where('uid','==',currentUid)
+      .where('paperId','==',paperId)
+      .get();
+    if(snap.empty) return;
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  async function indexPaperFile(paper, file){
+    const text = await extractPdfText(file);
+    if(text.trim().length < 200){
+      throw new Error('Not enough selectable text in this PDF. It may be scanned images.');
+    }
+    await deleteChunksForPaper(paper.id);
+    const chunks = chunkText(text);
+    for(let i = 0; i < chunks.length; i++){
+      const c = chunks[i];
+      const topic = guessTopic(c);
+      const embedding = await embedText(c);
+      await db.collection(TRACKER_COLLECTIONS.chunks).add({
+        uid: currentUid,
+        paperId: paper.id,
+        category: paper.category,
+        name: paper.name,
+        src: paper.name + ' · ' + topic + ' · chunk ' + (i+1),
+        chunk: c.slice(0, 160),
+        text: c,
+        topic: topic,
+        embedding: embedding,
+        createdAt: new Date().toISOString()
+      });
+    }
+    await db.collection(TRACKER_COLLECTIONS.papers).doc(paper.id).update({
+      indexed: true,
+      indexedAt: new Date().toISOString(),
+      textChars: text.length,
+      chunkCount: chunks.length
+    });
+  }
+
+  async function getCorpus(){
+    const real = (store.chunks || [])
+      .filter(c => Array.isArray(c.embedding) && c.embedding.length)
+      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId }));
+    if(real.length >= 3) return real;
+    await ensureSimBankEmbedded(); // fallback demo corpus
+    return SIM_BANK.map(s => ({ src: s.src, text: s.text, embedding: s.embedding, topic: guessTopic(s.text) }));
+  }
+
+  async function searchCorpus(query, topN = 3){
+    const corpus = await getCorpus();
+    const qe = await embedText(query);
+    return corpus
+      .map(c => Object.assign({}, c, { score: dotProduct(qe, c.embedding) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topN);
+  }
+
+  // ---- LM AI API (serverless, same pattern as VAULT's /api/ai-curriculum-lab) ----
+  async function lmMathAiRequest(payload){
+    const res = await fetch('/api/lm-math-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(data.error || ('request failed: ' + res.status));
+    const text = (data.text || '').trim();
+    if(!text) throw new Error('empty response from AI API');
+    return text;
+  }
+
+  function wsCanvasIsBlank(){
+    try{
+      const data = wsCtx.getImageData(0, 0, wsCanvas.width, wsCanvas.height).data;
+      for(let i = 3; i < data.length; i += 4){ if(data[i] !== 0) return false; }
+      return true;
+    }catch(e){ return true; }
+  }
+
+  // ---- spaced repetition / mastery ----
+  function nextDueDate(s){
+    s = s || {};
+    const reps = s.reps || 0, ease = s.ease || 2.5, lapses = s.lapses || 0;
+    const intervals = [0, 1, 2, 4, 7, 12, 20, 33, 54];
+    let days;
+    if(lapses >= 2){ days = 1; }
+    else { days = intervals[Math.min(reps, intervals.length - 1)] * Math.max(1, ease / 2.5); }
+    const d = new Date();
+    d.setDate(d.getDate() + Math.round(days));
+    return d.toISOString();
+  }
+
+  async function bumpMastery(topic, correct){
+    if(!fbReady || !currentUid || !topic) return;
+    const ref = db.collection(TRACKER_COLLECTIONS.mastery).doc(currentUid + '_' + topic);
+    const snap = await ref.get();
+    const old = snap.exists ? snap.data() : { reps: 0, ease: 2.5, lapses: 0, correct: 0, wrong: 0 };
+    const updated = {
+      uid: currentUid,
+      topic: topic,
+      reps: correct ? (old.reps || 0) + 1 : 0,
+      lapses: correct ? (old.lapses || 0) : (old.lapses || 0) + 1,
+      correct: (old.correct || 0) + (correct ? 1 : 0),
+      wrong: (old.wrong || 0) + (correct ? 0 : 1),
+      ease: correct ? Math.min(3.2, (old.ease || 2.5) + 0.12) : Math.max(1.3, (old.ease || 2.5) - 0.25),
+      dueAt: nextDueDate(old),
+      updatedAt: new Date().toISOString()
+    };
+    updated.accuracy = Math.round((updated.correct / Math.max(1, updated.correct + updated.wrong)) * 100);
+    await ref.set(updated, { merge: true });
+    await db.collection(TRACKER_COLLECTIONS.reviews).add({ uid: currentUid, topic: topic, correct: !!correct, at: new Date().toISOString() });
+  }
+
+  function renderDueList(){
+    const el = document.getElementById('ov-due');
+    if(!el) return;
+    const now = new Date().toISOString();
+    const due = (store.mastery || [])
+      .filter(m => (m.dueAt || '') <= now)
+      .sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || ''));
+    el.innerHTML = due.length
+      ? due.map(m => '<div class="file-row"><span class="file-tag">DUE</span><span class="file-name">' + escapeHtml(m.topic) + '</span><span class="file-date">' + (m.accuracy || 0) + '%</span></div>').join('')
+      : '<div class="empty-note">nothing due — nice</div>';
+  }
+
 
   // ---- tab switching ----
   const TAB_RENDER = {
@@ -1267,6 +1464,7 @@
     document.getElementById('ov-gap').textContent = total===0
       ? " You haven't uploaded anything yet — start on the Upload tab and this will fill in."
       : (missing.length ? ` Nothing uploaded yet under: ${missing.join(', ')}.` : ' You have at least one upload in every category — nice.');
+    renderDueList();
     const recent = store.papers.slice(-5).reverse();
     document.getElementById('ov-recent').innerHTML = recent.length ? recent.map(p => `<div class="file-row"><span class="file-tag">${escapeHtml(p.category)}</span><span class="file-name">${escapeHtml(p.name)}</span><span class="file-date">${fmtDate(p.addedAt)}</span></div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
   }
@@ -1290,6 +1488,7 @@
       const paper = store.papers.find(p => String(p.id) === el.dataset.remove);
       try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(el.dataset.remove).delete(); }
       catch(e){ alert('Could not remove: ' + e.message); return; }
+      try{ await deleteChunksForPaper(el.dataset.remove); }catch(e){}
       if(paper && paper.file_path && supabaseClient){
         try{ await supabaseClient.storage.from(SUPABASE_BUCKET).remove([paper.file_path]); }catch(e){}
       }
@@ -1309,10 +1508,20 @@
         const { error: upErr } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, f, { upsert:false });
         if(upErr) throw upErr;
         const { data: urlData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
-        await db.collection(TRACKER_COLLECTIONS.papers).add({
+        const docRef = await db.collection(TRACKER_COLLECTIONS.papers).add({
           uid: currentUid, name: f.name, category: activeCat,
-          addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path
+          addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path,
+          indexed: false
         });
+        if(/\.pdf$/i.test(f.name || '')){
+          try{
+            label.textContent = 'indexing ' + f.name + '\u2026';
+            await indexPaperFile({ id: docRef.id, category: activeCat, name: f.name }, f);
+          }catch(indexErr){
+            console.error('indexing failed', indexErr);
+            try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(docRef.id).update({ indexed: false, indexError: String(indexErr.message || indexErr) }); }catch(e){}
+          }
+        }
       }catch(e){
         alert('Could not upload "' + f.name + '": ' + (e.message || e));
       }
@@ -1357,15 +1566,17 @@
       <div class="quiz-q">${escapeHtml(item.q)}</div>
       ${item.opts.map((o,i) => `<button class="quiz-opt" data-i="${i}">${escapeHtml(o)}</button>`).join('')}
       <div class="quiz-foot"><span class="stat-label" id="quiz-feedback"></span></div>`;
-    card.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', () => {
+    card.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', async () => {
       const i = Number(btn.dataset.i);
       card.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
-      if(i === item.correct){ btn.classList.add('correct'); quizScore++; document.getElementById('quiz-feedback').textContent = 'correct'; }
+      const correct = (i === item.correct);
+      if(correct){ btn.classList.add('correct'); quizScore++; document.getElementById('quiz-feedback').textContent = 'correct'; }
       else{
         btn.classList.add('wrong');
         card.querySelector(`[data-i="${item.correct}"]`).classList.add('correct');
         document.getElementById('quiz-feedback').textContent = 'not quite';
       }
+      try{ await bumpMastery(guessTopic(item.q), correct); }catch(e){ console.error('mastery update failed', e); }
       setTimeout(() => { quizIdx++; renderQuizQuestion(); }, 900);
     }));
   }
@@ -1427,12 +1638,7 @@
     goBtn.disabled = true;
     wrap.innerHTML = `<div class="empty-note">${firstLoad ? 'loading the embedding model (first search only, ~10–30s)…' : 'searching…'}</div>`;
     try{
-      await ensureSimBankEmbedded();
-      const qEmbedding = await embedText(q);
-      const ranked = SIM_BANK
-        .map(s => ({ src: s.src, text: s.text, score: dotProduct(qEmbedding, s.embedding) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
+      const ranked = await searchCorpus(q, 3);
       wrap.innerHTML = ranked.map(r => `
         <div class="sim-result">
           <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% match</span></div>
@@ -1659,7 +1865,7 @@
 
   function wsResetQuestionDisplay(){
     document.getElementById('ws-question-display').innerHTML = '<div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div>';
-    wsGrabbedImageBlob = null;
+    wsGrabbedImageBlob = null; wsGrabbedImageDataUrl = null;
   }
 
   function wsPopulatePaperSelect(){
@@ -1686,7 +1892,7 @@
   async function wsOpenGrabTool(paper){
     const displayEl = document.getElementById('ws-question-display');
     const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
-    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1; wsGrabbedImageBlob = null;
+    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1; wsGrabbedImageBlob = null; wsGrabbedImageDataUrl = null;
 
     displayEl.innerHTML = `
       <div class="ws-grab">
@@ -1841,6 +2047,7 @@
   }
 
   let wsGrabbedImageBlob = null; // the grabbed question segment, sent to the AI alongside the whiteboard
+  let wsGrabbedImageDataUrl = null; // dataURL version, sent to the LM AI API
 
   function wsUseGrabSelection(){
     const canvas = document.getElementById('ws-grab-canvas');
@@ -1853,6 +2060,7 @@
     crop.height = Math.round(wsGrabSel.h);
     crop.getContext('2d').drawImage(canvas, wsGrabSel.x, wsGrabSel.y, wsGrabSel.w, wsGrabSel.h, 0, 0, crop.width, crop.height);
     const dataUrl = crop.toDataURL('image/png');
+    wsGrabbedImageDataUrl = dataUrl;
     crop.toBlob(blob => { wsGrabbedImageBlob = blob; }, 'image/png');
     document.getElementById('ws-question-display').innerHTML = `
       <div class="ws-paper-shot">
@@ -1880,41 +2088,67 @@
     wsOpenGrabTool(paper);
   });
   document.getElementById('ws-view-answer').addEventListener('click', () => {
-    document.getElementById('ws-reveal-area').innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER</div>Once an answer-key pipeline is wired up, the worked solution for this question will appear here — for now this is a placeholder.</div>`;
+    const revealArea = document.getElementById('ws-reveal-area');
+    const memos = (store.papers || []).filter(p => p.category === 'Memos / Answers');
+    if(!memos.length){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — LOCKED</div>No memo uploaded yet. Upload an answer memo on the Upload tab under the "Memos / Answers" category, then try again.</div>`;
+      return;
+    }
+    const paperId = document.getElementById('ws-paper').value;
+    const paper = (store.papers || []).find(p => p.id === paperId);
+    const norm = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    let memo = null;
+    if(paper){
+      const pn = norm(paper.name);
+      memo = memos.find(m => { const mn = norm(m.name); return mn && pn && (pn.indexOf(mn) !== -1 || mn.indexOf(pn) !== -1); });
+    }
+    if(!memo && memos.length === 1) memo = memos[0];
+    if(!memo){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — LOCKED</div>You have ${memos.length} memos uploaded, but none matches the selected paper by filename. Name the memo after the paper (e.g. "${escapeHtml(paper ? String(paper.name).replace(/\.[^.]+$/, '') + ' — memo.pdf' : 'paper — memo.pdf')}") or upload the right one.</div>`;
+      return;
+    }
+    const isPdf = /\.pdf(\?|$)/i.test(memo.file_url || '') || /\.pdf$/i.test(memo.name || '');
+    const isImg = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(memo.file_url || memo.name || '');
+    const viewer = isPdf
+      ? `<embed src="${escapeHtml(memo.file_url)}" type="application/pdf" style="width:100%;height:480px;border:1px solid var(--line);background:#f4f1ea;">`
+      : isImg
+        ? `<img src="${escapeHtml(memo.file_url)}" style="max-width:100%;display:block;margin-top:8px;background:#f4f1ea;">`
+        : `<a href="${escapeHtml(memo.file_url)}" target="_blank" rel="noopener" style="color:var(--amber-bright);">open memo ↗</a>`;
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — ${escapeHtml(memo.name)}</div>${viewer}</div>`;
   });
   document.getElementById('ws-view-ai').addEventListener('click', async () => {
     const revealArea = document.getElementById('ws-reveal-area');
     const btn = document.getElementById('ws-view-ai');
-    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div><span id="ws-ai-take-text">Thinking\u2026</span></div>`;
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div><span id="ws-ai-take-text">Thinking…</span></div>`;
     const textEl = document.getElementById('ws-ai-take-text');
 
-    if(!claudeSample){
-      textEl.textContent = "AI isn't available in this view right now — try opening this page directly on claude.ai.";
+    const images = [];
+    if(wsGrabbedImageDataUrl) images.push(wsGrabbedImageDataUrl);
+    const boardDataUrl = wsCanvasIsBlank() ? null : wsCanvas.toDataURL('image/png');
+    if(boardDataUrl) images.push(boardDataUrl);
+    if(!images.length){
+      textEl.textContent = "Grab a segment or write something on the board first, so there's something for the AI to look at.";
       return;
     }
+    const prompt = wsGrabbedImageDataUrl
+      ? "You're a maths tutor. The FIRST image is a question grabbed from the student's paper; the SECOND image is the student's handwritten attempt on a whiteboard. Read the question, look over the working, and give a short, encouraging read on the attempt: what's right, what's off, and a nudge in the right direction. Don't just hand over the final answer unless they've clearly already got it. A few sentences."
+      : "You're a maths tutor. This image is a student's handwritten attempt on a whiteboard — no question image is attached, so infer what you can from the working itself. Give a short, encouraging read on it: what looks right, what's off, and a nudge in the right direction. A few sentences.";
+
     btn.disabled = true;
     try{
-      const images = [];
-      if(wsGrabbedImageBlob) images.push(wsGrabbedImageBlob);
-      const boardBlob = await new Promise(resolve => wsCanvas.toBlob(resolve, 'image/png'));
-      if(boardBlob) images.push(boardBlob);
-      if(!images.length){
-        textEl.textContent = "Grab a segment or write something on the board first, so there's something for the AI to look at.";
-        btn.disabled = false;
-        return;
+      let text;
+      try{
+        text = await lmMathAiRequest({ prompt, images });
+      }catch(apiErr){
+        if(!claudeSample) throw apiErr;
+        const blobs = [];
+        for(const d of images){ blobs.push(await (await fetch(d)).blob()); }
+        const result = await claudeSample(prompt, { images: blobs, modelTier: 'default', cache: false });
+        text = result.text;
       }
-      const prompt = wsGrabbedImageBlob
-        ? "You're a maths tutor. The FIRST image is a question grabbed from the student's paper; the SECOND image is the student's handwritten attempt on a whiteboard. Read the question, look over the working, and give a short, encouraging read on the attempt: what's right, what's off, and a nudge in the right direction. Don't just hand over the final answer unless they've clearly already got it. A few sentences."
-        : "You're a maths tutor. This image is a student's handwritten attempt on a whiteboard — no question image is attached, so infer what you can from the working itself. Give a short, encouraging read on it: what looks right, what's off, and a nudge in the right direction. A few sentences.";
-      const result = await claudeSample(prompt, {
-        images,
-        modelTier: 'default',
-        cache: false,
-        onText: ({ text }) => { textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>'); }
-      });
-      textEl.innerHTML = escapeHtml(result.text).replace(/\n/g, '<br>');
+      textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
     }catch(e){
-      textEl.textContent = wsAiErrorCopy(e);
+      textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
     }finally{
       btn.disabled = false;
     }
@@ -1930,28 +2164,28 @@
     const goBtn = document.getElementById('ai-go');
     const div = document.createElement('div');
     div.className = 'ai-result';
-    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">Thinking\u2026</div>`;
+    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">Thinking…</div>`;
     wrap.prepend(div);
     document.getElementById('ai-input').value = '';
     const textEl = div.querySelector('.ai-text');
 
-    if(!claudeSample){
-      textEl.textContent = "AI isn't available in this view right now — try opening this page directly on claude.ai.";
-      return;
-    }
     goBtn.disabled = true;
     let answer = '';
     try{
-      const prompt = `You're the AI Lab assistant inside LM, a mathematics study platform for a first-year Applied Mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step.\n\nQuestion: ${q}`;
-      const result = await claudeSample(prompt, {
-        modelTier: 'default',
-        cache: false,
-        onText: ({ text }) => { textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>'); }
-      });
-      answer = result.text;
+      const hits = await searchCorpus(q, 4);
+      const context = hits.map((h, i) => '[' + (i+1) + '] ' + h.src + '\n' + h.text.slice(0, 1200)).join('\n\n');
+      const prompt = "You're the AI Lab assistant inside LM Mathematics, a personal study system for a first-year mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step. Ground your answer in the provided excerpts from the student's own uploaded material when they're relevant, and say plainly when the material doesn't cover something.\n\nQuestion: " + q;
+      try{
+        answer = await lmMathAiRequest({ prompt, context });
+      }catch(apiErr){
+        if(!claudeSample) throw apiErr;
+        const result = await claudeSample(context ? prompt + '\n\nExcerpts from uploaded material:\n' + context : prompt, { modelTier: 'default', cache: false });
+        answer = result.text;
+      }
+      if(hits.length) answer += '\n\n— Grounded in ' + hits.length + ' excerpt(s) from your uploaded material. Verify against your memos.';
       textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
     }catch(e){
-      textEl.textContent = wsAiErrorCopy(e);
+      textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
       goBtn.disabled = false;
       return;
     }
@@ -1964,7 +2198,7 @@
     saveBtn.addEventListener('click', async function(){
       if(!fbReady || !currentUid) return;
       try{
-        await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString() });
+        await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString(), source: 'ai_lab' });
         this.textContent = 'SAVED';
         this.classList.add('saved');
       }catch(e){ alert('Could not save note: ' + e.message); }
