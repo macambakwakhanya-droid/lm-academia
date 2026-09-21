@@ -266,8 +266,11 @@
   .ws-grab-selection{ position:absolute; left:0; top:0; width:0; height:0; border:2px dashed var(--amber-bright); background:rgba(255,183,3,0.12); display:none; pointer-events:none; }
   .ws-paper-shot{ background:#f4f1ea; border-radius:2px; padding:18px; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.35); margin-bottom:18px; }
   .ws-paper-shot img{ max-width:100%; display:block; margin:0 auto 12px; box-shadow:0 2px 10px rgba(0,0,0,0.25); }
-  .ws-body{ display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; max-width:1040px; }
-  @media(max-width:900px){ .ws-body{ grid-template-columns:1fr; } }
+  .ws-body{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  @media(max-width:980px){ .ws-body{ grid-template-columns:1fr; } }
+  .ws-pane-paper, .ws-pane-board{ min-width:0; }
+  .ws-pane-label{ font-size:9.5px; letter-spacing:1.5px; color:var(--dim); margin-bottom:8px; }
+  .ws-pane-paper .ws-grab-viewport{ max-height:620px; }
   .ws-attempt{ border:1px solid var(--line); background:var(--panel); }
   .ws-canvas-toolbar{ display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
   .ws-color-swatches{ display:flex; gap:6px; }
@@ -283,14 +286,6 @@
   .ws-attempt-actions{ display:flex; gap:10px; padding:12px 16px; border-top:1px solid var(--line); flex-wrap:wrap; }
   .ws-reveal{ border:1px solid var(--line); padding:16px 18px; margin-top:14px; font-size:12.5px; color:var(--text); line-height:1.75; }
   .ws-reveal .wr-tag{ font-size:9.5px; letter-spacing:1.5px; color:var(--amber); margin-bottom:8px; }
-  .ws-side-card{ border:1px solid var(--line); background:var(--panel); padding:16px 18px; margin-bottom:16px; }
-  .ws-side-card .wsc-title{ font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; margin-bottom:12px; }
-  .ws-pattern-step{ font-size:11.5px; color:var(--text); line-height:1.6; margin-bottom:8px; padding-left:18px; position:relative; }
-  .ws-pattern-step .wp-num{ position:absolute; left:0; color:var(--amber); }
-  .ws-suggest{ animation: wsSlideIn .5s ease both; }
-  @keyframes wsSlideIn{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
-  .ws-suggest .ws-suggest-tag{ font-size:9.5px; letter-spacing:1px; color:var(--amber); margin-bottom:8px; }
-  .ws-suggest .ws-suggest-text{ font-size:12px; color:var(--text); line-height:1.6; }
 
   /* ---- quiz ---- */
   .quiz-card{ border:1px solid var(--line); padding:26px; max-width:560px; }
@@ -637,10 +632,13 @@
         </div>
       </div>
 
-      <div id="ws-question-display"><div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div></div>
-
       <div class="ws-body">
-        <div>
+        <div class="ws-pane-paper">
+          <div class="ws-pane-label">PAPER</div>
+          <div id="ws-question-display"><div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div></div>
+        </div>
+        <div class="ws-pane-board">
+          <div class="ws-pane-label">WORKING BOARD</div>
           <div class="ws-attempt">
             <div class="ws-canvas-toolbar">
               <div class="ws-color-swatches">
@@ -670,16 +668,6 @@
             </div>
           </div>
           <div id="ws-reveal-area"></div>
-        </div>
-        <div>
-          <div class="ws-side-card">
-            <div class="wsc-title">Solving Pattern</div>
-            <div id="ws-pattern-box"><span class="empty-note" style="padding:0;">load a question to see its pattern</span></div>
-          </div>
-          <div class="ws-side-card">
-            <div class="wsc-title">Similar Problem</div>
-            <div id="ws-suggest-box"><span class="empty-note" style="padding:0;">load a question to see a similar one</span></div>
-          </div>
         </div>
       </div>
     </div>
@@ -1440,9 +1428,8 @@
   }
 
   // ============ WORKSPACE ============
-  // Timer, question selector, and attempt area. "Similar Problem" reuses the same
-  // embedding model + SIM_BANK corpus as the Similar Questions tab — not a separate
-  // fake. "View Answer" / "View AI's Take" are placeholders until an answer-key
+  // Timer, paper selector, and the paper/board split attempt area.
+  // "View Answer" / "View AI's Take" are placeholders until an answer-key
   // pipeline and the AI Lab backend exist.
   let wsTimerRemaining = 25 * 60;
   let wsTimerTotal = 25 * 60;
@@ -1492,38 +1479,6 @@
   });
   document.getElementById('ws-timer-input').addEventListener('change', wsResetTimer);
 
-  function matchSolvingPattern(text){
-    const lower = text.toLowerCase();
-    if(lower.includes('ladder') || lower.includes('slides') || lower.includes('rate at which')) return PATTERNS.find(p => p.name === 'Related Rates');
-    if(lower.includes('integration by parts') || lower.includes('by parts')) return PATTERNS.find(p => p.name === 'Integration by Parts');
-    if(lower.includes('induction')) return PATTERNS.find(p => p.name === 'Proof by Induction');
-    return null;
-  }
-  function wsSetPattern(pattern){
-    const box = document.getElementById('ws-pattern-box');
-    if(!pattern){
-      box.innerHTML = '<span class="empty-note" style="padding:0;">no specific framework matched — check the Solving Patterns tab</span>';
-      return;
-    }
-    box.innerHTML = pattern.steps.map((s,i) => `<div class="ws-pattern-step"><span class="wp-num">${i+1}.</span>${escapeHtml(s)}</div>`).join('');
-  }
-  async function wsLoadSuggestion(match){
-    const box = document.getElementById('ws-suggest-box');
-    box.innerHTML = '<span class="empty-note" style="padding:0;">finding a similar problem…</span>';
-    try{
-      await ensureSimBankEmbedded();
-      const qEmbedding = await embedText(match.text);
-      const ranked = SIM_BANK
-        .map(s => ({ src: s.src, text: s.text, score: dotProduct(qEmbedding, s.embedding) }))
-        .filter(s => s.text !== match.text)
-        .sort((a, b) => b.score - a.score);
-      const best = ranked[0];
-      if(!best){ box.innerHTML = '<span class="empty-note" style="padding:0;">no similar problem found</span>'; return; }
-      box.innerHTML = `<div class="ws-suggest"><div class="ws-suggest-tag">${Math.round(best.score*100)}% MATCH · ${escapeHtml(best.src)}</div><div class="ws-suggest-text">${escapeHtml(best.text)}</div></div>`;
-    }catch(e){
-      box.innerHTML = '<span class="empty-note" style="padding:0;">could not load the similarity model</span>';
-    }
-  }
   // ============ WORKSPACE — drawing canvas ============
   // Freehand pen input via the Pointer Events API (covers mouse, touch, and
   // stylus uniformly), with color/brush selection, an eraser, undo, clear,
@@ -1627,9 +1582,6 @@
 
   function wsResetQuestionDisplay(){
     document.getElementById('ws-question-display').innerHTML = '<div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div>';
-    wsSetPattern(null);
-    document.getElementById('ws-pattern-box').innerHTML = '<span class="empty-note" style="padding:0;">no framework yet — this needs text, and a grabbed segment is just an image until a transcription step is wired up</span>';
-    document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">same here — similar-question matching needs text, not just the image</span>';
   }
 
   function wsPopulatePaperSelect(){
@@ -1656,9 +1608,6 @@
     const displayEl = document.getElementById('ws-question-display');
     const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
     wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null;
-    wsSetPattern(null);
-    document.getElementById('ws-pattern-box').innerHTML = '<span class="empty-note" style="padding:0;">grab a segment, then use it, to see a matching framework here</span>';
-    document.getElementById('ws-suggest-box').innerHTML = '<span class="empty-note" style="padding:0;">grab a segment, then use it, to see a similar problem here</span>';
 
     displayEl.innerHTML = `
       <div class="ws-grab">
@@ -1807,8 +1756,6 @@
     document.getElementById('ws-reveal-area').innerHTML = '';
     wsClearCanvas(false);
     wsUndoStack = [];
-    // No OCR/transcription step yet, so pattern-matching and similar-question
-    // suggestions stay unavailable for a grabbed image until that's wired up.
   }
 
   document.getElementById('ws-paper').addEventListener('change', e => {
