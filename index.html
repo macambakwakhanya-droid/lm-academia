@@ -981,6 +981,35 @@
     }
   }catch(e){ console.error('Firebase init failed', e); }
 
+  // ============ AI (Claude "sample" capability) ============
+  // Resolves once this view can actually run it; null on any other host —
+  // callers must design for absence rather than assuming it's there.
+  let claudeSample = null;
+  let claudeSampleLimits = null;
+  (async () => {
+    try{
+      claudeSample = (window.claude && typeof window.claude.use === 'function')
+        ? await window.claude.use('sample') : null;
+      if(claudeSample){
+        claudeSampleLimits = await claudeSample.limits().catch(() => null);
+      }
+    }catch(e){ claudeSample = null; }
+  })();
+  function wsAiErrorCopy(e){
+    switch(e && e.code){
+      case 'not_granted': return "AI access isn't allowed for this artifact right now.";
+      case 'sampling_disabled': return "AI isn't available for this account.";
+      case 'images_unavailable': return "This view can't send images to the AI yet.";
+      case 'image_rejected': return "Couldn't read one of the images — try grabbing the segment again.";
+      case 'rate_limited': return "Too many requests right now — give it a moment and try again.";
+      case 'session_expired': return "Please sign back in to use the AI.";
+      case 'refused': return "The AI declined to respond to that — try a different attempt.";
+      case 'empty_completion': return "The AI didn't return anything — try again.";
+      case 'cancelled': return 'Cancelled.';
+      default: return "Couldn't reach the AI just now — try again in a moment.";
+    }
+  }
+
   const TRACKER_COLLECTIONS = {
     papers: 'tracker_papers',
     quizAttempts: 'tracker_quiz_attempts',
@@ -1630,6 +1659,7 @@
 
   function wsResetQuestionDisplay(){
     document.getElementById('ws-question-display').innerHTML = '<div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div>';
+    wsGrabbedImageBlob = null;
   }
 
   function wsPopulatePaperSelect(){
@@ -1656,7 +1686,7 @@
   async function wsOpenGrabTool(paper){
     const displayEl = document.getElementById('ws-question-display');
     const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
-    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1;
+    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1; wsGrabbedImageBlob = null;
 
     displayEl.innerHTML = `
       <div class="ws-grab">
@@ -1810,6 +1840,8 @@
     ['pointerup','pointercancel'].forEach(evt => canvas.addEventListener(evt, () => { dragging = false; }));
   }
 
+  let wsGrabbedImageBlob = null; // the grabbed question segment, sent to the AI alongside the whiteboard
+
   function wsUseGrabSelection(){
     const canvas = document.getElementById('ws-grab-canvas');
     if(!canvas || !wsGrabSel || wsGrabSel.w < 8 || wsGrabSel.h < 8){
@@ -1821,6 +1853,7 @@
     crop.height = Math.round(wsGrabSel.h);
     crop.getContext('2d').drawImage(canvas, wsGrabSel.x, wsGrabSel.y, wsGrabSel.w, wsGrabSel.h, 0, 0, crop.width, crop.height);
     const dataUrl = crop.toDataURL('image/png');
+    crop.toBlob(blob => { wsGrabbedImageBlob = blob; }, 'image/png');
     document.getElementById('ws-question-display').innerHTML = `
       <div class="ws-paper-shot">
         <img src="${dataUrl}" alt="question segment">
@@ -1849,30 +1882,86 @@
   document.getElementById('ws-view-answer').addEventListener('click', () => {
     document.getElementById('ws-reveal-area').innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER</div>Once an answer-key pipeline is wired up, the worked solution for this question will appear here — for now this is a placeholder.</div>`;
   });
-  document.getElementById('ws-view-ai').addEventListener('click', () => {
-    document.getElementById('ws-reveal-area').innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Once the AI Lab is wired to a real model, its read on your attempt will appear here — for now this is a placeholder.</div>`;
+  document.getElementById('ws-view-ai').addEventListener('click', async () => {
+    const revealArea = document.getElementById('ws-reveal-area');
+    const btn = document.getElementById('ws-view-ai');
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div><span id="ws-ai-take-text">Thinking\u2026</span></div>`;
+    const textEl = document.getElementById('ws-ai-take-text');
+
+    if(!claudeSample){
+      textEl.textContent = "AI isn't available in this view right now — try opening this page directly on claude.ai.";
+      return;
+    }
+    btn.disabled = true;
+    try{
+      const images = [];
+      if(wsGrabbedImageBlob) images.push(wsGrabbedImageBlob);
+      const boardBlob = await new Promise(resolve => wsCanvas.toBlob(resolve, 'image/png'));
+      if(boardBlob) images.push(boardBlob);
+      if(!images.length){
+        textEl.textContent = "Grab a segment or write something on the board first, so there's something for the AI to look at.";
+        btn.disabled = false;
+        return;
+      }
+      const prompt = wsGrabbedImageBlob
+        ? "You're a maths tutor. The FIRST image is a question grabbed from the student's paper; the SECOND image is the student's handwritten attempt on a whiteboard. Read the question, look over the working, and give a short, encouraging read on the attempt: what's right, what's off, and a nudge in the right direction. Don't just hand over the final answer unless they've clearly already got it. A few sentences."
+        : "You're a maths tutor. This image is a student's handwritten attempt on a whiteboard — no question image is attached, so infer what you can from the working itself. Give a short, encouraging read on it: what looks right, what's off, and a nudge in the right direction. A few sentences.";
+      const result = await claudeSample(prompt, {
+        images,
+        modelTier: 'default',
+        cache: false,
+        onText: ({ text }) => { textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>'); }
+      });
+      textEl.innerHTML = escapeHtml(result.text).replace(/\n/g, '<br>');
+    }catch(e){
+      textEl.textContent = wsAiErrorCopy(e);
+    }finally{
+      btn.disabled = false;
+    }
   });
   function renderWorkspace(){ wsUpdateTimerDisplay(); wsPopulatePaperSelect(); requestAnimationFrame(wsApplyZoom); }
 
   // ============ AI LAB / AI NOTES ============
-  function fakeAiAnswer(q){
-    const lower = q.toLowerCase();
-    if(lower.includes('related rate')) return 'Related-rates problems come up often in this module — start from the Solving Patterns tab, which has the full framework and a worked example.';
-    if(lower.includes('integra')) return 'For integration questions, check whether substitution or integration by parts fits better — the Solving Patterns tab has both frameworks side by side.';
-    return `Once your papers are uploaded and this is wired to a real model, this is where it would search through your own material for "${q}" — for now, this is a placeholder response showing how the interaction will work.`;
-  }
   function renderAiLab(){ document.getElementById('ai-results').innerHTML = ''; }
-  document.getElementById('ai-go').addEventListener('click', () => {
+  document.getElementById('ai-go').addEventListener('click', async () => {
     const q = document.getElementById('ai-input').value.trim();
     if(!q) return;
     const wrap = document.getElementById('ai-results');
-    const answer = fakeAiAnswer(q);
+    const goBtn = document.getElementById('ai-go');
     const div = document.createElement('div');
     div.className = 'ai-result';
-    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">${escapeHtml(answer)}</div><div class="ai-save">SAVE TO AI NOTES</div>`;
+    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">Thinking\u2026</div>`;
     wrap.prepend(div);
     document.getElementById('ai-input').value = '';
-    div.querySelector('.ai-save').addEventListener('click', async function(){
+    const textEl = div.querySelector('.ai-text');
+
+    if(!claudeSample){
+      textEl.textContent = "AI isn't available in this view right now — try opening this page directly on claude.ai.";
+      return;
+    }
+    goBtn.disabled = true;
+    let answer = '';
+    try{
+      const prompt = `You're the AI Lab assistant inside LM, a mathematics study platform for a first-year Applied Mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step.\n\nQuestion: ${q}`;
+      const result = await claudeSample(prompt, {
+        modelTier: 'default',
+        cache: false,
+        onText: ({ text }) => { textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>'); }
+      });
+      answer = result.text;
+      textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
+    }catch(e){
+      textEl.textContent = wsAiErrorCopy(e);
+      goBtn.disabled = false;
+      return;
+    }
+    goBtn.disabled = false;
+
+    const saveBtn = document.createElement('div');
+    saveBtn.className = 'ai-save';
+    saveBtn.textContent = 'SAVE TO AI NOTES';
+    div.appendChild(saveBtn);
+    saveBtn.addEventListener('click', async function(){
       if(!fbReady || !currentUid) return;
       try{
         await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString() });
