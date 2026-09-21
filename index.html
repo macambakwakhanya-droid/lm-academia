@@ -600,7 +600,7 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // PERSONAL SYSTEM</div>
         <div class="lm-heading">OVERVIEW</div>
-        <div class="lm-desc">Where you stand this semester — uploads, quiz average, and what's still missing.</div>
+        <div class="lm-desc">This semester so far — files you've uploaded, your sample-quiz average, and which categories are still empty.</div>
       </div>
       <div class="sec-title">This Semester, So Far</div>
       <div class="stat-row" id="ov-stats"></div>
@@ -699,7 +699,7 @@
         <div class="lm-heading">UPLOAD</div>
         <div class="lm-desc">Add papers, notes, and tutorials — sorted by category as you go.</div>
       </div>
-      <div class="sec-note">Files upload to your account's storage and sync across devices. PDFs are indexed automatically in your browser — text extracted, chunked, embedded — so Similar Questions, the AI Lab, and workspace suggestions draw on your own material. Upload answer memos under "Memos / Answers" to unlock VIEW ANSWER.</div>
+      <div class="sec-note">Files upload to storage and sync across devices. They are opened through direct links, so if your storage bucket is public, anyone who has a file's link can open it. Only PDFs with selectable text are indexed (first 100 pages, in your browser). Scanned PDFs, images, videos and other formats are stored but are not searchable. Indexed text is used by Similar Questions and the AI Lab. It is not used by the workspace. Each file below shows its real indexing status. Upload answer memos under "Memos / Answers" to unlock VIEW ANSWER.</div>
       <div class="dropzone" id="dropzone">
         <div id="dropzone-label">drag files here, or click to browse</div>
         <input type="file" id="file-input" multiple style="display:none">
@@ -717,9 +717,9 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // SELF-CHECK</div>
         <div class="lm-heading">QUICK QUIZ</div>
-        <div class="lm-desc">Five questions to check where you actually stand right now.</div>
+        <div class="lm-desc">Five fixed sample questions on basic calculus. A quick warm-up, not a measure of where you stand.</div>
       </div>
-      <div class="sec-note">Sample questions below — once past papers are uploaded and processed, questions here will be drawn from your own material instead.</div>
+      <div class="sec-note">These five questions are fixed and hand-written. They are not generated from your uploads, and the quiz does not adapt to your material.</div>
       <div class="sec-title">Quick Quiz</div>
       <div class="quiz-card" id="quiz-card"></div>
     </div>
@@ -731,7 +731,7 @@
         <div class="lm-heading">SIMILAR QUESTIONS</div>
         <div class="lm-desc">Find past-paper questions that resemble the one in front of you.</div>
       </div>
-      <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js. Once your PDFs are uploaded and indexed, search runs over your own papers — a small demo set fills the gap until then.</div>
+      <div class="sec-note">Matching uses a sentence-embedding model (MiniLM) running in your browser. Once at least 3 text chunks from your PDFs are indexed, search runs over your uploads, and results are excerpts of your files, not necessarily whole questions. Until then it searches a small built-in SAMPLE set. Those results are labelled SAMPLE and are not from your papers. The percentage is a similarity score, not a probability of being the same question.</div>
       <div class="sec-title">Similar Questions</div>
       <div class="sim-search">
         <input id="sim-input" type="text" placeholder="paste or type a question...">
@@ -760,9 +760,9 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // AI-ASSISTED</div>
         <div class="lm-heading">AI LAB</div>
-        <div class="lm-desc">Ask a question about your module and get a research-style answer.</div>
+        <div class="lm-desc">Ask a question about your module and get an AI-written answer.</div>
       </div>
-      <div class="sec-note">Answers come from the LM AI API (same server-side pattern as VAULT's AI Lab), grounded in your uploaded material when relevant. Verify important results against your memos.</div>
+      <div class="sec-note">Answers are written by an AI model and can contain mistakes, including in maths. When relevant excerpts from your indexed uploads are found they are sent along, and the answer says which ones. Otherwise the answer comes from the model's general knowledge and says so. Always check against your memos.</div>
       <div class="ai-prompt">
         <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
         <button class="go-btn" id="ai-go">RESEARCH</button>
@@ -843,7 +843,7 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // TRACK RECORD</div>
         <div class="lm-heading">PROGRESS</div>
-        <div class="lm-desc">Quiz scores over time, and what you've uploaded, by category.</div>
+        <div class="lm-desc">Sample-quiz scores over time, and what you've uploaded, by category.</div>
       </div>
       <div class="panel">
         <div class="panel-head"><span class="panel-title">Quiz Scores Over Time</span></div>
@@ -1216,9 +1216,9 @@
   // DASHBOARD — state, tab switching, and per-tab rendering.
   // Data now lives in Firestore (tracker_* collections, scoped by uid)
   // with live onSnapshot listeners, and uploaded files go to Supabase
-  // Storage. Quiz questions, similar-question matches, and AI Lab
-  // answers below are still placeholder content until a real
-  // embedding/Gemini pipeline reads what's actually uploaded.
+  // Storage. NOTE: the Quick Quiz uses a fixed hand-written bank (not generated
+  // from uploads). Similar Questions and the AI Lab search indexed uploads
+  // when >= 3 chunks exist; otherwise they use a labelled SAMPLE set.
   // ============================================================
   let store = { papers: [], quizAttempts: [], aiNotes: [], events: [], chunks: [], mastery: [], reviews: [], activity: [] };
   let storeUnsubscribers = {};
@@ -1295,6 +1295,7 @@
     const pdf = await pdfjsLib.getDocument({ data }).promise;
     let out = '';
     const limit = Math.min(pdf.numPages, 100);
+    extractPdfText.lastInfo = { totalPages: pdf.numPages, pagesRead: limit };
     for(let p = 1; p <= limit; p++){
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
@@ -1316,11 +1317,13 @@
 
   async function indexPaperFile(paper, file){
     const text = await extractPdfText(file);
+    const info = extractPdfText.lastInfo || {};
     if(text.trim().length < 200){
       throw new Error('Not enough selectable text in this PDF. It may be scanned images.');
     }
     await deleteChunksForPaper(paper.id);
     const chunks = chunkText(text);
+    try{
     for(let i = 0; i < chunks.length; i++){
       const c = chunks[i];
       const topic = guessTopic(c);
@@ -1338,22 +1341,32 @@
         createdAt: new Date().toISOString()
       });
     }
+    }catch(err){
+      // don't leave half-indexed chunks behind
+      try{ await deleteChunksForPaper(paper.id); }catch(e){}
+      throw err;
+    }
     await db.collection(TRACKER_COLLECTIONS.papers).doc(paper.id).update({
       indexed: true,
+      indexError: '',
       indexedAt: new Date().toISOString(),
       textChars: text.length,
-      chunkCount: chunks.length
+      chunkCount: chunks.length,
+      pagesIndexed: info.pagesRead || null,
+      totalPages: info.totalPages || null
     });
   }
 
   async function getCorpus(){
     const real = (store.chunks || [])
       .filter(c => Array.isArray(c.embedding) && c.embedding.length)
-      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId }));
+      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId, name: c.name, demo: false }));
     if(real.length >= 3) return real;
     await ensureSimBankEmbedded(); // fallback demo corpus
-    return SIM_BANK.map(s => ({ src: s.src, text: s.text, embedding: s.embedding, topic: guessTopic(s.text) }));
+    return SIM_BANK.map(s => ({ src: s.src, text: s.text, embedding: s.embedding, topic: guessTopic(s.text), demo: true }));
   }
+  // Below this cosine similarity an excerpt is not treated as relevant.
+  const MIN_RELEVANT_SCORE = 0.3;
 
   async function searchCorpus(query, topN = 3){
     const corpus = await getCorpus();
@@ -1456,8 +1469,8 @@
     const total = store.papers.length;
     const avgQuiz = store.quizAttempts.length ? Math.round(store.quizAttempts.reduce((a,q)=>a+q.score/q.total,0)/store.quizAttempts.length*100) : null;
     document.getElementById('ov-stats').innerHTML = `
-      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">PAPERS UPLOADED</div></div>
-      <div class="stat-card"><div class="stat-num">${avgQuiz===null?'—':avgQuiz+'%'}</div><div class="stat-label">AVG QUIZ SCORE</div></div>
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">FILES UPLOADED</div></div>
+      <div class="stat-card"><div class="stat-num">${avgQuiz===null?'—':avgQuiz+'%'}</div><div class="stat-label">AVG SAMPLE-QUIZ SCORE</div></div>
       <div class="stat-card"><div class="stat-num">${store.events.length}</div><div class="stat-label">ASSESSMENTS LOGGED</div></div>
       <div class="stat-card"><div class="stat-num">${store.aiNotes.length}</div><div class="stat-label">AI NOTES SAVED</div></div>`;
     const missing = UPLOAD_CATS.filter(c => !counts[c]);
@@ -1475,13 +1488,23 @@
     document.querySelectorAll('.cat-btn').forEach(b => b.addEventListener('click', () => { activeCat = b.dataset.cat; renderUpload(); }));
     renderFileList();
   }
+  function indexStatus(p){
+    if(!/\.pdf$/i.test(p.name || '')) return 'not indexed (not a PDF)';
+    if(p.indexed){
+      let t = 'indexed, ' + (p.chunkCount || 0) + ' chunks';
+      if(p.totalPages && p.pagesIndexed && p.pagesIndexed < p.totalPages) t += ' (first ' + p.pagesIndexed + ' of ' + p.totalPages + ' pages only)';
+      return t;
+    }
+    if(p.indexError) return 'NOT indexed: ' + p.indexError;
+    return 'not indexed';
+  }
   function renderFileList(){
     const wrap = document.getElementById('file-list');
     wrap.innerHTML = store.papers.length ? store.papers.slice().reverse().map(p => `
       <div class="file-row">
         <span class="file-tag">${escapeHtml(p.category)}</span>
         <span class="file-name">${p.file_url ? `<a href="${escapeHtml(p.file_url)}" target="_blank" rel="noopener" style="color:inherit;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</span>
-        <span class="file-date">${fmtDate(p.addedAt)}</span>
+        <span class="file-date">${fmtDate(p.addedAt)} · ${escapeHtml(indexStatus(p))}</span>
         <span class="file-remove" data-remove="${p.id}">remove</span>
       </div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
     wrap.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', async () => {
@@ -1501,6 +1524,7 @@
     if(!supabaseClient){ alert('File storage isn\u2019t available \u2014 check the Supabase config.'); return; }
     const label = document.getElementById('dropzone-label');
     const originalLabel = label.textContent;
+    const problems = [];
     for(const f of files){
       label.textContent = 'uploading ' + f.name + '\u2026';
       try{
@@ -1519,14 +1543,17 @@
             await indexPaperFile({ id: docRef.id, category: activeCat, name: f.name }, f);
           }catch(indexErr){
             console.error('indexing failed', indexErr);
+            problems.push(f.name + ': uploaded, but NOT indexed (' + (indexErr.message || indexErr) + ')');
             try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(docRef.id).update({ indexed: false, indexError: String(indexErr.message || indexErr) }); }catch(e){}
           }
         }
+        else { problems.push(f.name + ': uploaded, but not searchable (only PDFs are indexed)'); }
       }catch(e){
         alert('Could not upload "' + f.name + '": ' + (e.message || e));
       }
     }
     label.textContent = originalLabel;
+    if(problems.length) alert('Upload finished with notes:\n\n' + problems.join('\n'));
   }
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('file-input');
@@ -1583,9 +1610,9 @@
 
   // ============ SIMILAR QUESTIONS — real embedding model ============
   // Client-side sentence embeddings via transformers.js (MiniLM), no server needed —
-  // same pattern as the SNISS embedding workspace. The SIM_BANK corpus below stands
-  // in for real uploaded past papers until that pipeline exists; everything past
-  // computing the embeddings themselves already works with real data, not fake data.
+  // same pattern as the SNISS embedding workspace. The SIM_BANK corpus below is
+  // a built-in SAMPLE set used only when fewer than 3 real chunks are indexed.
+  // Results from it are always labelled SAMPLE in the UI.
   const SIM_BANK = [
     { src:'2020 Past Paper, Q4', text:'Find the derivative of f(x) = x³ - 2x² + 5x using first principles.' },
     { src:'2021 Past Paper, Q2', text:'Use implicit differentiation to find dy/dx for x² + y² = 25.' },
@@ -1639,9 +1666,13 @@
     wrap.innerHTML = `<div class="empty-note">${firstLoad ? 'loading the embedding model (first search only, ~10–30s)…' : 'searching…'}</div>`;
     try{
       const ranked = await searchCorpus(q, 3);
-      wrap.innerHTML = ranked.map(r => `
+      const anyDemo = ranked.some(r => r.demo);
+      const banner = anyDemo
+        ? '<div class="empty-note" style="color:var(--amber);font-style:normal;">SAMPLE DATA: fewer than 3 chunks of your PDFs are indexed, so these come from a built-in sample set, not your papers.</div>'
+        : '';
+      wrap.innerHTML = banner + ranked.map(r => `
         <div class="sim-result">
-          <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% match</span></div>
+          <div class="sim-top"><span>${r.demo ? 'SAMPLE · ' : 'YOUR UPLOAD · '}${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% similarity</span></div>
           <div class="sim-text">${escapeHtml(r.text)}</div>
         </div>`).join('');
     }catch(e){
@@ -1672,8 +1703,8 @@
 
   // ============ WORKSPACE ============
   // Timer, paper selector, and the paper/board split attempt area.
-  // "View Answer" / "View AI's Take" are placeholders until an answer-key
-  // pipeline and the AI Lab backend exist.
+  // "View Answer" shows an uploaded memo matched by filename. "View AI's Take"
+  // sends the images to the AI backend; its output is AI-generated and unverified.
   let wsTimerRemaining = 25 * 60;
   let wsTimerTotal = 25 * 60;
   let wsTimerInterval = null;
@@ -2146,7 +2177,7 @@
         const result = await claudeSample(prompt, { images: blobs, modelTier: 'default', cache: false });
         text = result.text;
       }
-      textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+      textEl.innerHTML = escapeHtml(text + '\n\n— AI-generated from images of your handwriting. It can misread your working or be wrong. Check against the memo.').replace(/\n/g, '<br>');
     }catch(e){
       textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
     }finally{
@@ -2172,9 +2203,16 @@
     goBtn.disabled = true;
     let answer = '';
     try{
-      const hits = await searchCorpus(q, 4);
+      let hits = [];
+      let searchFailed = false;
+      try{
+        hits = (await searchCorpus(q, 4)).filter(h => !h.demo && h.score >= MIN_RELEVANT_SCORE);
+      }catch(searchErr){
+        console.error('excerpt search failed', searchErr);
+        searchFailed = true;
+      }
       const context = hits.map((h, i) => '[' + (i+1) + '] ' + h.src + '\n' + h.text.slice(0, 1200)).join('\n\n');
-      const prompt = "You're the AI Lab assistant inside LM Mathematics, a personal study system for a first-year mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step. Ground your answer in the provided excerpts from the student's own uploaded material when they're relevant, and say plainly when the material doesn't cover something.\n\nQuestion: " + q;
+      const prompt = "You're the AI Lab assistant inside LM Mathematics, a personal study system for a first-year mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step. Ground your answer in the provided excerpts from the student's own uploaded material when they're relevant, and say plainly when the material doesn't cover something. If no excerpts are provided, answer from general knowledge and do not claim to be using the student's material. If you are unsure of a result, say so rather than guessing.\n\nQuestion: " + q;
       try{
         answer = await lmMathAiRequest({ prompt, context });
       }catch(apiErr){
@@ -2182,7 +2220,12 @@
         const result = await claudeSample(context ? prompt + '\n\nExcerpts from uploaded material:\n' + context : prompt, { modelTier: 'default', cache: false });
         answer = result.text;
       }
-      if(hits.length) answer += '\n\n— Grounded in ' + hits.length + ' excerpt(s) from your uploaded material. Verify against your memos.';
+      if(hits.length){
+        const names = Array.from(new Set(hits.map(h => h.name || h.src))).join(', ');
+        answer += '\n\n— The AI was given ' + hits.length + ' excerpt(s) from your uploads (' + names + '). That does not guarantee the answer is correct. Verify against your memos.';
+      } else {
+        answer += '\n\n— No relevant excerpts from your uploads were sent' + (searchFailed ? ' (the excerpt search failed)' : '') + ', so this answer comes from the AI\'s general knowledge and may be wrong. Verify it.';
+      }
       textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
     }catch(e){
       textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
@@ -2285,9 +2328,9 @@
 
   // ============ EXPLORE ============
   const EXPLORE_FACTS = [
-    { fact:'The equals sign (=) was invented in 1557 by Robert Recorde, who said he chose two parallel lines "because no two things can be more equal."', src:"History of mathematical notation" },
+    { fact:'The equals sign (=) was introduced in 1557 by Robert Recorde, who explained (in old English) that he chose two parallel lines because no two things could be more equal.', src:"History of mathematical notation" },
     { fact:'There are infinitely many prime numbers — Euclid proved this over 2000 years ago with a strikingly short proof.', src:"Euclid's Elements, Book IX" },
-    { fact:'The Fibonacci sequence appears in sunflower seed spirals, pinecones, and nautilus shells.', src:'Phyllotaxis research' },
+    { fact:'Fibonacci numbers show up in the spiral counts of sunflower seed heads and pinecones. (Nautilus shells are often claimed too, but their spiral is not a Fibonacci or golden-ratio spiral.)', src:'Phyllotaxis research' },
     { fact:'Calculus was developed independently by both Newton and Leibniz in the late 1600s — the dy/dx notation comes from Leibniz.', src:'History of calculus' },
     { fact:'"Googol" (10¹⁰⁰) was coined by a 9-year-old in 1920, asked by his mathematician uncle to name a very large number.', src:'Mathematics and the Imagination, Kasner & Newman' },
     { fact:'"Proof by contradiction" was used to show √2 is irrational — one of the oldest proof techniques still taught today.', src:'Classical Greek mathematics' }
