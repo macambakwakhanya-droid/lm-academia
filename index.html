@@ -237,8 +237,9 @@
   .lm-heading{ font-family:Georgia,'Times New Roman',serif; font-weight:400; letter-spacing:1.5px; font-size:clamp(22px,3vw,32px); margin:8px 0 6px; color:#ece9dc; }
   .lm-desc{ color:#89877a; font-size:12px; margin:0; line-height:1.6; max-width:760px; }
   .ws-timer-box{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; width:250px; flex-shrink:0; }
-  .ws-tank{ position:relative; width:100%; height:26px; border:1px solid var(--amber); background:transparent; overflow:hidden; transition:border-color .4s linear; }
-  .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; letter-spacing:1.5px; color:#fff; font-variant-numeric:tabular-nums; pointer-events:none; }
+  .ws-tank{ position:relative; width:100%; height:38px; border:2px solid var(--amber); background:#1c1c18; overflow:hidden; transition:border-color .4s linear; }
+  .ws-tank-fill{ position:absolute; top:0; right:0; bottom:0; width:100%; background:linear-gradient(180deg, #ffb703, #d99a2b); transition:width 1s linear, background-color .4s linear; }
+  .ws-timer-display{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; letter-spacing:1.5px; color:#fff; font-variant-numeric:tabular-nums; pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,0.55); z-index:1; }
   .ws-timer-controls{ display:flex; gap:4px; justify-content:flex-end; flex-wrap:nowrap; width:100%; }
   .ws-timer-controls input{ width:38px; flex-shrink:0; background:transparent; border:1px solid var(--line); color:var(--text); font-family:inherit; font-size:12px; padding:5px 2px; text-align:center; -moz-appearance:textfield; }
   .ws-timer-controls input::-webkit-outer-spin-button, .ws-timer-controls input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
@@ -620,6 +621,7 @@
         <div class="lm-title">LM WORKSPACE</div>
         <div class="ws-timer-box">
           <div class="ws-tank" id="ws-tank">
+            <div class="ws-tank-fill" id="ws-tank-fill"></div>
             <div class="ws-timer-display" id="ws-timer-display">25:00</div>
           </div>
           <div class="ws-timer-controls">
@@ -1451,7 +1453,13 @@
   function wsUpdateTimerDisplay(){
     document.getElementById('ws-timer-display').textContent = wsFormatTime(Math.max(0, wsTimerRemaining));
     const elapsedFrac = wsTimerTotal > 0 ? 1 - Math.max(0, Math.min(1, wsTimerRemaining / wsTimerTotal)) : 0;
+    const remainingFrac = 1 - elapsedFrac;
     document.getElementById('ws-tank').style.borderColor = wsLerpColor('#d99a2b', '#6f6f64', elapsedFrac);
+    const fill = document.getElementById('ws-tank-fill');
+    if(fill){
+      fill.style.width = (remainingFrac * 100) + '%';
+      fill.style.background = `linear-gradient(180deg, ${wsLerpColor('#ffb703', '#6f6f64', elapsedFrac)}, ${wsLerpColor('#d99a2b', '#4d4d45', elapsedFrac)})`;
+    }
   }
   function wsStartTimer(){
     if(wsTimerRunning) return;
@@ -1643,11 +1651,12 @@
   let wsGrabPdf = null;
   let wsGrabPageNum = 1;
   let wsGrabSel = null; // { x, y, w, h } in the rendered canvas's own pixel coordinates
+  let wsGrabZoom = 1;
 
   async function wsOpenGrabTool(paper){
     const displayEl = document.getElementById('ws-question-display');
     const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
-    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null;
+    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1;
 
     displayEl.innerHTML = `
       <div class="ws-grab">
@@ -1655,7 +1664,12 @@
           <button class="ws-canvas-btn" id="ws-grab-prev" ${isPdf ? '' : 'style="display:none;"'}>&larr; PAGE</button>
           <span id="ws-grab-page-label">${isPdf ? 'loading\u2026' : escapeHtml(paper.name)}</span>
           <button class="ws-canvas-btn" id="ws-grab-next" ${isPdf ? '' : 'style="display:none;"'}>PAGE &rarr;</button>
-          <span style="margin-left:auto;">drag on the page below to select the segment you want to work on</span>
+          <span class="ws-zoom-controls">
+            <button class="ws-canvas-btn" id="ws-grab-zoom-out">−</button>
+            <span id="ws-grab-zoom-label">100%</span>
+            <button class="ws-canvas-btn" id="ws-grab-zoom-in">+</button>
+          </span>
+          <span style="margin-left:auto;">drag to select the segment you want to work on</span>
           <button class="go-btn" id="ws-grab-use">USE THIS SEGMENT</button>
         </div>
         <div class="ws-grab-viewport" id="ws-grab-viewport">
@@ -1683,6 +1697,28 @@
     document.getElementById('ws-grab-prev').addEventListener('click', () => wsGrabChangePage(-1));
     document.getElementById('ws-grab-next').addEventListener('click', () => wsGrabChangePage(1));
     document.getElementById('ws-grab-use').addEventListener('click', wsUseGrabSelection);
+    document.getElementById('ws-grab-zoom-in').addEventListener('click', () => { wsGrabZoom = Math.min(3, +(wsGrabZoom + 0.15).toFixed(2)); wsApplyGrabZoom(); });
+    document.getElementById('ws-grab-zoom-out').addEventListener('click', () => { wsGrabZoom = Math.max(0.25, +(wsGrabZoom - 0.15).toFixed(2)); wsApplyGrabZoom(); });
+  }
+
+  function wsApplyGrabZoom(){
+    const canvas = document.getElementById('ws-grab-canvas');
+    if(!canvas || !canvas.width) return;
+    canvas.style.width = (canvas.width * wsGrabZoom) + 'px';
+    canvas.style.height = (canvas.height * wsGrabZoom) + 'px';
+    const label = document.getElementById('ws-grab-zoom-label');
+    if(label) label.textContent = Math.round(wsGrabZoom * 100) + '%';
+    // keep the selection box aligned with the page at the new zoom level
+    const box = document.getElementById('ws-grab-selection');
+    if(box && wsGrabSel){
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      box.style.left = (wsGrabSel.x * scaleX) + 'px';
+      box.style.top = (wsGrabSel.y * scaleY) + 'px';
+      box.style.width = (wsGrabSel.w * scaleX) + 'px';
+      box.style.height = (wsGrabSel.h * scaleY) + 'px';
+    }
   }
 
   async function wsRenderGrabPage(){
@@ -1696,6 +1732,7 @@
     wsGrabSel = null;
     const box = document.getElementById('ws-grab-selection');
     if(box) box.style.display = 'none';
+    wsApplyGrabZoom();
   }
 
   function wsGrabChangePage(delta){
@@ -1716,6 +1753,7 @@
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
         canvas.getContext('2d').drawImage(img, 0, 0);
+        wsApplyGrabZoom();
         resolve();
       };
       img.onerror = () => {
