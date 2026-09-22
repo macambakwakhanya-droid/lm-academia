@@ -456,14 +456,16 @@
   .live-feed-controls{ display:flex; gap:8px; margin-top:10px; justify-content:center; }
   .live-nav-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); width:42px; height:34px; cursor:pointer; font-size:13px; }
   .live-nav-btn:hover{ color:var(--amber); border-color:var(--amber); }
-  .live-video-col{ min-height:0; overflow-y:auto; border:1px solid var(--line); background:var(--panel); padding:16px; }
-  .live-video-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .live-video-tile{ position:relative; aspect-ratio:9/16; background:#000; overflow:hidden; cursor:pointer; border:1px solid var(--line); }
-  .live-video-tile img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.85; }
-  .live-video-tile:hover img{ opacity:1; }
-  .live-video-tile .lv-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.6); pointer-events:none; }
-  .live-video-tile .lv-vtitle{ position:absolute; left:0; right:0; bottom:0; padding:8px 8px 7px; font-size:10.5px; line-height:1.35; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.85)); }
-  .live-video-tile iframe{ width:100%; height:100%; border:0; display:block; }
+  .live-video-col{ display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); background:var(--panel); }
+  .live-video-head{ padding:12px 14px 8px; font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; flex-shrink:0; }
+  .live-video-feed{ flex:1; min-height:0; overflow-y:auto; scroll-snap-type:y mandatory; background:#000; }
+  .live-video-slide{ scroll-snap-align:start; scroll-snap-stop:always; height:100%; min-height:100%; position:relative; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; }
+  .lv-frame{ position:relative; width:100%; height:100%; }
+  .lv-frame img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.9; }
+  .lv-frame iframe{ width:100%; height:100%; border:0; display:block; }
+  .lv-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; color:#fff; text-shadow:0 1px 8px rgba(0,0,0,.7); pointer-events:none; }
+  .lv-vtitle{ position:absolute; left:0; right:0; bottom:0; padding:18px 18px 16px; font-size:13px; line-height:1.45; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.88)); }
+  .live-video-controls{ display:flex; gap:8px; justify-content:center; padding:8px; flex-shrink:0; }
   .live-empty-note{ color:var(--dim); font-size:12px; line-height:1.7; padding:6px 2px; grid-column:1/-1; }
   .live-empty-note code{ color:var(--amber); }
 
@@ -902,8 +904,12 @@
           </div>
         </div>
         <div class="live-video-col">
-          <div class="stat-label" style="margin-bottom:10px;">RELATED VIDEOS</div>
-          <div id="live-videos"></div>
+          <div class="live-video-head">RELATED VIDEOS</div>
+          <div class="live-video-feed" id="live-videos"></div>
+          <div class="live-video-controls">
+            <button class="live-nav-btn" id="live-video-up" title="Previous video">▲</button>
+            <button class="live-nav-btn" id="live-video-down" title="Next video">▼</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2711,7 +2717,7 @@
       feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Couldn\'t load the live feed: ' + escapeHtml(e.message || String(e)) + '</div></div>';
     }
   }
-  // Per-query pagination state for the video grid. YouTube pages results one
+  // Per-query pagination state for the video feed. YouTube pages results one
   // query at a time, so we track a nextPageToken per interest and stop
   // asking a given interest once it runs out.
   let liveVideoSeen = new Set();
@@ -2719,22 +2725,49 @@
   let liveVideoExhausted = new Set();
   let liveVideoLoadingMore = false;
   let liveVideoScrollWired = false;
+  const liveVideoDataById = new Map();
+  let liveVideoObserver = null;
 
-  function liveVideoTileEl(v){
-    const el = document.createElement('div');
-    el.className = 'live-video-tile';
-    el.innerHTML = `
+  function lvThumbHtml(v){
+    return `
       <img src="${escapeHtml(v.thumbnail || '')}" alt="" loading="lazy">
       <div class="lv-play">▶</div>
       <div class="lv-vtitle">${escapeHtml(v.title)}<br><span style="opacity:.75;">${escapeHtml(v.channel || '')}</span></div>`;
-    el.addEventListener('click', () => {
-      el.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-    }, { once: true });
+  }
+  function lvIframeHtml(v){
+    return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&mute=1&playsinline=1&rel=0" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }
+  // One full-screen slide per video — TikTok-style: scroll snaps to the
+  // next one, and whichever slide is actually on screen autoplays (muted;
+  // tap the player to unmute) while the rest sit as thumbnails.
+  function liveVideoSlideEl(v){
+    liveVideoDataById.set(v.videoId, v);
+    const el = document.createElement('div');
+    el.className = 'live-video-slide';
+    el.dataset.videoId = v.videoId;
+    el.innerHTML = `<div class="lv-frame">${lvThumbHtml(v)}</div>`;
+    if(liveVideoObserver) liveVideoObserver.observe(el);
     return el;
   }
-  // Trickles tiles into the grid one at a time instead of the whole batch
-  // landing at once — same infinite grid, just a smoother, continuous feed.
-  function appendTilesStaggered(grid, vids, delay){
+  function liveVideoSetupObserver(feedEl){
+    if(liveVideoObserver) liveVideoObserver.disconnect();
+    liveVideoObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        const frame = entry.target.querySelector('.lv-frame');
+        const v = liveVideoDataById.get(entry.target.dataset.videoId);
+        if(!frame || !v) return;
+        const isPlaying = !!frame.querySelector('iframe');
+        if(entry.isIntersecting && entry.intersectionRatio >= 0.75){
+          if(!isPlaying) frame.innerHTML = lvIframeHtml(v);
+        } else if(isPlaying){
+          frame.innerHTML = lvThumbHtml(v); // scrolled away — stop playing it
+        }
+      });
+    }, { root: feedEl, threshold: [0, 0.75, 1] });
+  }
+  // Trickles slides into the feed one at a time instead of the whole batch
+  // landing at once — same infinite feed, just a smoother, continuous flow.
+  function appendTilesStaggered(feedEl, vids, delay){
     delay = delay || 90;
     return new Promise(resolve => {
       if(!vids.length){ resolve(); return; }
@@ -2742,9 +2775,9 @@
       (function next(){
         if(i >= vids.length){ resolve(); return; }
         const v = vids[i++];
-        if(document.body.contains(grid)){
+        if(document.body.contains(feedEl)){
           liveVideoSeen.add(v.videoId);
-          grid.appendChild(liveVideoTileEl(v));
+          feedEl.appendChild(liveVideoSlideEl(v));
         }
         setTimeout(next, delay);
       })();
@@ -2761,47 +2794,47 @@
   }
   async function liveFetchVideos(){
     const wrap = document.getElementById('live-videos');
-    wrap.innerHTML = '<div class="live-video-grid" id="live-video-grid"><div class="live-empty-note">Loading videos…</div></div>';
+    liveVideoSetupObserver(wrap);
+    wrap.innerHTML = '<div class="live-empty-note">Loading videos…</div>';
     liveVideoSeen = new Set(); liveVideoTokens = {}; liveVideoExhausted = new Set(); liveVideoLoadingMore = false;
     const interests = liveGetInterests();
-    if(!interests.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Add an interest above to get videos.</div></div>'; return; }
+    if(!interests.length){ wrap.innerHTML = '<div class="live-empty-note">Add an interest above to get videos.</div>'; return; }
     try{
       const data = await liveVideoRequest(interests, {});
       if(data.notConfigured){
-        wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div></div>';
+        wrap.innerHTML = '<div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div>';
         return;
       }
       const vids = data.videos || [];
       liveVideoTokens = data.nextPageTokens || {};
       interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
-      if(!vids.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">No videos found for these interests right now.</div></div>'; return; }
-      // Thumbnail grid, TikTok-Shorts style: nothing plays until tapped, so
-      // we're not loading a dozen iframes at once. Tiles trickle in one at
+      if(!vids.length){ wrap.innerHTML = '<div class="live-empty-note">No videos found for these interests right now.</div>'; return; }
+      // Nothing plays until its slide is actually on screen, so we're not
+      // running a dozen YouTube players at once. Slides trickle in one at
       // a time rather than the whole batch appearing together.
-      wrap.innerHTML = '<div class="live-video-grid" id="live-video-grid"></div>';
-      const grid = document.getElementById('live-video-grid');
-      await appendTilesStaggered(grid, vids);
+      wrap.innerHTML = '';
+      await appendTilesStaggered(wrap, vids);
       if(!liveVideoScrollWired){
         liveVideoScrollWired = true;
         wrap.addEventListener('scroll', () => {
           if(liveVideoLoadingMore) return;
-          if(wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) liveLoadMoreVideos();
+          if(wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 800) liveLoadMoreVideos();
         });
       }
     }catch(e){
-      wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div></div>';
+      wrap.innerHTML = '<div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div>';
     }
   }
   async function liveLoadMoreVideos(){
-    const grid = document.getElementById('live-video-grid');
-    if(!grid) return;
+    const wrap = document.getElementById('live-videos');
+    if(!wrap) return;
     const interests = liveGetInterests().filter(q => !liveVideoExhausted.has(q));
     if(!interests.length){
-      if(!grid.querySelector('.lv-end-note')){
+      if(!wrap.querySelector('.lv-end-note')){
         const note = document.createElement('div');
         note.className = 'live-empty-note lv-end-note';
         note.textContent = "That's everything for these interests right now — add another interest for more.";
-        grid.appendChild(note);
+        wrap.appendChild(note);
       }
       return;
     }
@@ -2809,7 +2842,7 @@
     const loading = document.createElement('div');
     loading.className = 'live-empty-note';
     loading.textContent = 'Loading more…';
-    grid.appendChild(loading);
+    wrap.appendChild(loading);
     try{
       const pageTokens = {};
       interests.forEach(q => { if(liveVideoTokens[q]) pageTokens[q] = liveVideoTokens[q]; });
@@ -2819,7 +2852,7 @@
       liveVideoTokens = Object.assign({}, liveVideoTokens, data.nextPageTokens || {});
       interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
       const fresh = (data.videos || []).filter(v => !liveVideoSeen.has(v.videoId));
-      await appendTilesStaggered(grid, fresh);
+      await appendTilesStaggered(wrap, fresh);
     }catch(e){
       loading.textContent = 'Could not load more: ' + (e.message || e);
     }finally{
@@ -2837,6 +2870,9 @@
       document.getElementById('live-up').addEventListener('click', () => feed.scrollBy({ top: -feed.clientHeight, behavior: 'smooth' }));
       document.getElementById('live-down').addEventListener('click', () => feed.scrollBy({ top: feed.clientHeight, behavior: 'smooth' }));
       document.getElementById('live-refresh').addEventListener('click', () => { liveFetchFeed(); liveFetchVideos(); });
+      const videoFeed = document.getElementById('live-videos');
+      document.getElementById('live-video-up').addEventListener('click', () => videoFeed.scrollBy({ top: -videoFeed.clientHeight, behavior: 'smooth' }));
+      document.getElementById('live-video-down').addEventListener('click', () => videoFeed.scrollBy({ top: videoFeed.clientHeight, behavior: 'smooth' }));
       feed.addEventListener('keydown', e => {
         if(e.key === 'ArrowDown'){ e.preventDefault(); feed.scrollBy({ top: feed.clientHeight, behavior: 'smooth' }); }
         if(e.key === 'ArrowUp'){ e.preventDefault(); feed.scrollBy({ top: -feed.clientHeight, behavior: 'smooth' }); }
