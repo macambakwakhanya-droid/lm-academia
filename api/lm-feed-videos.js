@@ -37,7 +37,8 @@ export default async function handler(req, res) {
     const results = await Promise.all(
       list.map(async q => {
         const url =
-          'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=date&maxResults=' +
+          'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=relevance' +
+          '&videoDuration=short&relevanceLanguage=en&maxResults=' +
           perQuery +
           '&q=' +
           encodeURIComponent(q) +
@@ -53,7 +54,8 @@ export default async function handler(req, res) {
           videoId: it.id?.videoId,
           title: it.snippet?.title,
           channel: it.snippet?.channelTitle,
-          publishedAt: it.snippet?.publishedAt
+          publishedAt: it.snippet?.publishedAt,
+          thumbnail: it.snippet?.thumbnails?.medium?.url || it.snippet?.thumbnails?.default?.url || ''
         })).filter(v => v.videoId);
       })
     );
