@@ -2711,38 +2711,100 @@
       feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Couldn\'t load the live feed: ' + escapeHtml(e.message || String(e)) + '</div></div>';
     }
   }
+  // Per-query pagination state for the video grid. YouTube pages results one
+  // query at a time, so we track a nextPageToken per interest and stop
+  // asking a given interest once it runs out.
+  let liveVideoSeen = new Set();
+  let liveVideoTokens = {};
+  let liveVideoExhausted = new Set();
+  let liveVideoLoadingMore = false;
+  let liveVideoScrollWired = false;
+
+  function liveVideoTileEl(v){
+    const el = document.createElement('div');
+    el.className = 'live-video-tile';
+    el.innerHTML = `
+      <img src="${escapeHtml(v.thumbnail || '')}" alt="" loading="lazy">
+      <div class="lv-play">▶</div>
+      <div class="lv-vtitle">${escapeHtml(v.title)}<br><span style="opacity:.75;">${escapeHtml(v.channel || '')}</span></div>`;
+    el.addEventListener('click', () => {
+      el.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    }, { once: true });
+    return el;
+  }
+  async function liveVideoRequest(interests, pageTokens){
+    const r = await fetch('/api/lm-feed-videos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interests, pageTokens })
+    });
+    const data = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(data.error || ('request failed (' + r.status + ')'));
+    return data;
+  }
   async function liveFetchVideos(){
     const wrap = document.getElementById('live-videos');
-    wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Loading videos…</div></div>';
+    wrap.innerHTML = '<div class="live-video-grid" id="live-video-grid"><div class="live-empty-note">Loading videos…</div></div>';
+    liveVideoSeen = new Set(); liveVideoTokens = {}; liveVideoExhausted = new Set(); liveVideoLoadingMore = false;
     const interests = liveGetInterests();
+    if(!interests.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Add an interest above to get videos.</div></div>'; return; }
     try{
-      const r = await fetch('/api/lm-feed-videos', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interests })
-      });
-      const data = await r.json().catch(() => ({}));
-      if(!r.ok || data.notConfigured){
+      const data = await liveVideoRequest(interests, {});
+      if(data.notConfigured){
         wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div></div>';
         return;
       }
       const vids = data.videos || [];
+      liveVideoTokens = data.nextPageTokens || {};
+      interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
       if(!vids.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">No videos found for these interests right now.</div></div>'; return; }
       // Thumbnail grid, TikTok-Shorts style: nothing plays until tapped, so
       // we're not loading a dozen iframes at once.
-      wrap.innerHTML = '<div class="live-video-grid">' + vids.map((v, i) => `
-        <div class="live-video-tile" data-i="${i}">
-          <img src="${escapeHtml(v.thumbnail || '')}" alt="" loading="lazy">
-          <div class="lv-play">▶</div>
-          <div class="lv-vtitle">${escapeHtml(v.title)}<br><span style="opacity:.75;">${escapeHtml(v.channel || '')}</span></div>
-        </div>`).join('') + '</div>';
-      wrap.querySelectorAll('.live-video-tile').forEach(tile => {
-        tile.addEventListener('click', () => {
-          const v = vids[Number(tile.dataset.i)];
-          tile.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-        }, { once: true });
-      });
+      wrap.innerHTML = '<div class="live-video-grid" id="live-video-grid"></div>';
+      const grid = document.getElementById('live-video-grid');
+      vids.forEach(v => { liveVideoSeen.add(v.videoId); grid.appendChild(liveVideoTileEl(v)); });
+      if(!liveVideoScrollWired){
+        liveVideoScrollWired = true;
+        wrap.addEventListener('scroll', () => {
+          if(liveVideoLoadingMore) return;
+          if(wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) liveLoadMoreVideos();
+        });
+      }
     }catch(e){
       wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div></div>';
+    }
+  }
+  async function liveLoadMoreVideos(){
+    const grid = document.getElementById('live-video-grid');
+    if(!grid) return;
+    const interests = liveGetInterests().filter(q => !liveVideoExhausted.has(q));
+    if(!interests.length){
+      if(!grid.querySelector('.lv-end-note')){
+        const note = document.createElement('div');
+        note.className = 'live-empty-note lv-end-note';
+        note.textContent = "That's everything for these interests right now — add another interest for more.";
+        grid.appendChild(note);
+      }
+      return;
+    }
+    liveVideoLoadingMore = true;
+    const loading = document.createElement('div');
+    loading.className = 'live-empty-note';
+    loading.textContent = 'Loading more…';
+    grid.appendChild(loading);
+    try{
+      const pageTokens = {};
+      interests.forEach(q => { if(liveVideoTokens[q]) pageTokens[q] = liveVideoTokens[q]; });
+      const data = await liveVideoRequest(interests, pageTokens);
+      loading.remove();
+      if(data.notConfigured){ liveVideoExhausted = new Set(liveGetInterests()); return; }
+      liveVideoTokens = Object.assign({}, liveVideoTokens, data.nextPageTokens || {});
+      interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
+      const fresh = (data.videos || []).filter(v => !liveVideoSeen.has(v.videoId));
+      fresh.forEach(v => { liveVideoSeen.add(v.videoId); grid.appendChild(liveVideoTileEl(v)); });
+    }catch(e){
+      loading.textContent = 'Could not load more: ' + (e.message || e);
+    }finally{
+      liveVideoLoadingMore = false;
     }
   }
   let liveWired = false;
