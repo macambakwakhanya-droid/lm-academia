@@ -5,6 +5,7 @@
 <title>LM Mathematics — Personal System</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ29sZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmQ5OGEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI0NSUiIHN0b3AtY29sb3I9IiNkOTlhMmIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGE1ZTE0Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDAsMTAwKSI+CiAgICA8Y2lyY2xlIHI9IjkwIiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iOCIvPgogICAgPHBhdGggZD0iTS01MCAyMiBMLTI2IC0zNyBMMCA2IEwyNiAtMzcgTDUwIDIyIFoiCiAgICAgICAgICBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwvZz4KPC9zdmc+Cg==">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.2/math.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -399,6 +400,11 @@
   .ai-result{ border:1px solid var(--line); padding:18px 20px; max-width:640px; margin-bottom:10px; }
   .ai-result .ai-tag{ font-size:9.5px; letter-spacing:1.5px; color:var(--amber); margin-bottom:10px; }
   .ai-result .ai-text{ font-size:12.5px; color:var(--text); line-height:1.75; }
+  .ai-check{ margin-top:12px; padding:9px 12px; border:1px solid var(--line); font-size:11.5px; line-height:1.6; color:var(--dim); }
+  .ai-check.ok{ border-color:var(--ok); color:var(--ok); }
+  .ai-check.bad{ border-color:var(--danger); color:#e0876e; }
+  .ai-check code{ color:var(--text); }
+  .ws-edit{ width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line); font-family:inherit; font-size:12px; padding:8px 10px; margin:4px 0 12px; resize:vertical; }
   .ai-result .ai-save{ margin-top:14px; display:inline-block; font-size:10.5px; letter-spacing:1px; color:var(--dim); border:1px solid var(--line); padding:5px 11px; cursor:pointer; }
   .ai-result .ai-save:hover{ border-color:var(--amber); color:var(--amber-bright); }
   .ai-result .ai-save.saved{ border-color:var(--ok); color:var(--ok); cursor:default; }
@@ -762,7 +768,7 @@
         <div class="lm-heading">AI LAB</div>
         <div class="lm-desc">Ask a question about your module and get an AI-written answer.</div>
       </div>
-      <div class="sec-note">Answers are written by an AI model and can contain mistakes, including in maths. When relevant excerpts from your indexed uploads are found they are sent along, and the answer says which ones. Otherwise the answer comes from the model's general knowledge and says so. Always check against your memos.</div>
+      <div class="sec-note">Answers are written by an AI model and can contain mistakes. When relevant excerpts from your indexed uploads are found they are sent along, and the answer says which ones. Otherwise it says the answer comes from general knowledge. The model may run code for calculations when the backend allows it. If the final result is a derivative, integral, single-equation solution or number, this page then re-checks it itself with math.js and shows VERIFIED, MISMATCH or NOT CHECKED. That check is numeric and covers only the final result, not your explanation or a proof. Always check against your memos.</div>
       <div class="ai-prompt">
         <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
         <button class="go-btn" id="ai-go">RESEARCH</button>
@@ -1360,7 +1366,7 @@
   async function getCorpus(){
     const real = (store.chunks || [])
       .filter(c => Array.isArray(c.embedding) && c.embedding.length)
-      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId, name: c.name, demo: false }));
+      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId, name: c.name, category: c.category, demo: false }));
     if(real.length >= 3) return real;
     await ensureSimBankEmbedded(); // fallback demo corpus
     return SIM_BANK.map(s => ({ src: s.src, text: s.text, embedding: s.embedding, topic: guessTopic(s.text), demo: true }));
@@ -1389,6 +1395,103 @@
     const text = (data.text || '').trim();
     if(!text) throw new Error('empty response from AI API');
     return text;
+  }
+
+  // One entry point for every AI call: your Vercel backend first, claude.ai fallback second.
+  async function runAi({ prompt, context, images, json, codeExecution, thinking }){
+    try{
+      return await lmMathAiRequest({ prompt, context, images, json: !!json, codeExecution: !!codeExecution, thinking });
+    }catch(apiErr){
+      if(!claudeSample) throw apiErr;
+      const blobs = [];
+      for(const d of (images || [])){ blobs.push(await (await fetch(d)).blob()); }
+      const full = context ? prompt + '\n\nExcerpts from uploaded material:\n' + context : prompt;
+      const opts = { modelTier: 'default', cache: false };
+      if(blobs.length) opts.images = blobs;
+      const result = await claudeSample(full, opts);
+      return result.text;
+    }
+  }
+  function parseJsonLoose(text){
+    let t = String(text || '').replace(/```json|```/gi, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if(a === -1 || b === -1) throw new Error('no JSON found');
+    return JSON.parse(t.slice(a, b + 1));
+  }
+
+  // ---- automatic answer checker (runs in your browser with math.js) ----
+  // It re-checks the AI's FINAL result numerically. It cannot check proofs or explanations.
+  // math.js has no ln()/arcsin() etc., so map common aliases before parsing.
+  const mjFix = x => String(x).replace(/\bln\s*\(/g, 'log(').replace(/\barc(sin|cos|tan)\s*\(/g, 'a$1(');
+  const mjParse = x => math.parse(mjFix(x));
+  const mjEvaluate = x => math.evaluate(mjFix(x));
+  const CHECK_POINTS = [-2.3,-1.7,-0.9,-0.4,0.3,0.6,0.77,1.1,1.43,1.9,2.6,3.4];
+  function mjEval(node, scope){
+    try{ const v = node.evaluate(scope); return (typeof v === 'number' && isFinite(v)) ? v : null; }
+    catch(e){ return null; }
+  }
+  function mjClose(a, b, tol){ return Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b)); }
+  function checkDerivativeClaim(fStr, dStr, v){
+    const f = mjParse(fStr), d = mjParse(dStr);
+    const h = 1e-5;
+    let ok = 0; const bad = [];
+    for(const x of CHECK_POINTS){
+      const hi = mjEval(f, { [v]: x + h }), lo = mjEval(f, { [v]: x - h });
+      const claimed = mjEval(d, { [v]: x });
+      if(hi === null || lo === null || claimed === null) continue;
+      if(mjClose((hi - lo) / (2 * h), claimed, 1e-4)) ok++; else bad.push(x);
+    }
+    return { ok, bad };
+  }
+  function runAutoCheck(spec){
+    if(!window.math) return { status: 'unchecked', msg: 'the maths library did not load, so the answer was not re-checked.' };
+    if(!spec || !spec.kind || spec.kind === 'none') return { status: 'unchecked', msg: 'the final result is not a derivative, integral, single-equation solution or number, so it can\'t be re-checked automatically.' };
+    const v = /^[a-zA-Z]$/.test(spec.variable || '') ? spec.variable : 'x';
+    try{
+      if(spec.kind === 'derivative' || spec.kind === 'antiderivative'){
+        const isDer = spec.kind === 'derivative';
+        const r = isDer ? checkDerivativeClaim(spec.given, spec.claimed, v) : checkDerivativeClaim(spec.claimed, spec.given, v);
+        const desc = isDer ? ('d/d' + v + ' of ' + spec.given + ' = ' + spec.claimed) : ('the derivative of ' + spec.claimed + ' equals ' + spec.given);
+        if(r.bad.length) return { status: 'fail', msg: 'MISMATCH. Claim checked: ' + desc + '. It fails at ' + v + ' = ' + r.bad.slice(0,3).join(', ') + '.' };
+        if(r.ok < 4) return { status: 'unchecked', msg: 'too few valid test points to judge (' + r.ok + '). Claim: ' + desc + '.' };
+        return { status: 'ok', msg: 'VERIFIED numerically at ' + r.ok + ' test points. Claim checked: ' + desc + '. This is a numeric check, not a symbolic proof, and the expression was read from your question by the AI, so make sure it matches.' };
+      }
+      if(spec.kind === 'solve'){
+        const parts = String(spec.given).split('=');
+        if(parts.length !== 2) return { status: 'unchecked', msg: 'could not read the equation.' };
+        const g = mjParse('(' + parts[0] + ')-(' + parts[1] + ')');
+        const sols = Array.isArray(spec.claimed) ? spec.claimed : [spec.claimed];
+        const badS = []; let n = 0;
+        for(const sol of sols){
+          const val = Number(mjEvaluate(String(sol)));
+          const r = mjEval(g, { [v]: val });
+          if(!isFinite(val) || r === null) continue;
+          n++;
+          if(Math.abs(r) > 1e-6 * Math.max(1, Math.abs(val))) badS.push(sol);
+        }
+        if(!n) return { status: 'unchecked', msg: 'could not evaluate the proposed solutions.' };
+        if(badS.length) return { status: 'fail', msg: 'MISMATCH. These proposed solutions do NOT satisfy ' + spec.given + ': ' + badS.join(', ') + '.' };
+        return { status: 'ok', msg: 'VERIFIED. Each proposed solution (' + sols.join(', ') + ') satisfies ' + spec.given + '. This does not prove that no solutions were missed.' };
+      }
+      if(spec.kind === 'value'){
+        const a = Number(mjEvaluate(String(spec.given))), b = Number(mjEvaluate(String(spec.claimed)));
+        if(!isFinite(a) || !isFinite(b)) return { status: 'unchecked', msg: 'could not evaluate the value.' };
+        if(mjClose(a, b, 1e-6)) return { status: 'ok', msg: 'VERIFIED. ' + spec.given + ' evaluates to ' + a + ', matching the AI\'s ' + spec.claimed + '.' };
+        return { status: 'fail', msg: 'MISMATCH. ' + spec.given + ' evaluates to ' + a + ', but the AI claimed ' + spec.claimed + '.' };
+      }
+    }catch(e){
+      return { status: 'unchecked', msg: 'the check itself failed (' + (e.message || e) + '), so the answer was not re-checked.' };
+    }
+    return { status: 'unchecked', msg: 'unknown check type.' };
+  }
+  async function autoCheckAnswer(question, answer){
+    const prompt = "Below are a student's QUESTION and an AI's ANSWER. If the answer's key result is (a) a derivative, (b) an antiderivative, (c) the solution(s) of ONE equation in ONE variable, or (d) one numeric value, extract it for automatic checking. Use math.js syntax: ^ for powers, explicit * for multiplication, sqrt(), log() for natural log, exp(), sin(), cos(), tan(), pi, e. Never include '+ C'. 'given' must be the ORIGINAL expression/equation from the QUESTION. 'claimed' must be the FINAL result from the ANSWER (an array of strings for solve). Return ONLY JSON: {\"kind\":\"derivative\"|\"antiderivative\"|\"solve\"|\"value\"|\"none\",\"variable\":\"x\",\"given\":\"...\",\"claimed\":\"...\"}. Use kind \"none\" if it is not one of these.\n\nQUESTION:\n" + question + "\n\nANSWER:\n" + answer;
+    try{
+      const raw = await runAi({ prompt, json: true, thinking: 'low' });
+      return runAutoCheck(parseJsonLoose(raw));
+    }catch(e){
+      return { status: 'unchecked', msg: 'could not extract a checkable result (' + (e.message || e) + ').' };
+    }
   }
 
   function wsCanvasIsBlank(){
@@ -2147,39 +2250,83 @@
         : `<a href="${escapeHtml(memo.file_url)}" target="_blank" rel="noopener" style="color:var(--amber-bright);">open memo ↗</a>`;
     revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — ${escapeHtml(memo.name)}</div>${viewer}</div>`;
   });
+  // "AI's Take" answers the QUESTION on the paper. It never looks at the
+  // student's whiteboard working and never grades the student.
   document.getElementById('ws-view-ai').addEventListener('click', async () => {
     const revealArea = document.getElementById('ws-reveal-area');
     const btn = document.getElementById('ws-view-ai');
-    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div><span id="ws-ai-take-text">Thinking…</span></div>`;
-    const textEl = document.getElementById('ws-ai-take-text');
-
-    const images = [];
-    if(wsGrabbedImageDataUrl) images.push(wsGrabbedImageDataUrl);
-    const boardDataUrl = wsCanvasIsBlank() ? null : wsCanvas.toDataURL('image/png');
-    if(boardDataUrl) images.push(boardDataUrl);
-    if(!images.length){
-      textEl.textContent = "Grab a segment or write something on the board first, so there's something for the AI to look at.";
+    if(!wsGrabbedImageDataUrl){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Grab a question from the paper first (crop it on the left). This does not look at your whiteboard working.</div>`;
       return;
     }
-    const prompt = wsGrabbedImageDataUrl
-      ? "You're a maths tutor. The FIRST image is a question grabbed from the student's paper; the SECOND image is the student's handwritten attempt on a whiteboard. Read the question, look over the working, and give a short, encouraging read on the attempt: what's right, what's off, and a nudge in the right direction. Don't just hand over the final answer unless they've clearly already got it. A few sentences."
-      : "You're a maths tutor. This image is a student's handwritten attempt on a whiteboard — no question image is attached, so infer what you can from the working itself. Give a short, encouraging read on it: what looks right, what's off, and a nudge in the right direction. A few sentences.";
-
+    const images = [wsGrabbedImageDataUrl];
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 1 OF 2 · READING THE QUESTION</div>Reading…</div>`;
     btn.disabled = true;
     try{
-      let text;
-      try{
-        text = await lmMathAiRequest({ prompt, images });
-      }catch(apiErr){
-        if(!claudeSample) throw apiErr;
-        const blobs = [];
-        for(const d of images){ blobs.push(await (await fetch(d)).blob()); }
-        const result = await claudeSample(prompt, { images: blobs, modelTier: 'default', cache: false });
-        text = result.text;
-      }
-      textEl.innerHTML = escapeHtml(text + '\n\n— AI-generated from images of your handwriting. It can misread your working or be wrong. Check against the memo.').replace(/\n/g, '<br>');
+      const tPrompt = "The image is a question cropped from a student's maths paper. Transcribe ONLY the question text, faithfully, as plain text using math.js-style notation where helpful. Do NOT answer or solve it here. Write [unclear] wherever you can't read something. Return ONLY JSON: {\"question\":\"...\",\"unclear\":[\"short notes on anything hard to read\"]}.";
+      const raw = await runAi({ prompt: tPrompt, images, json: true, thinking: 'low' });
+      const t = parseJsonLoose(raw);
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 1 OF 2 · CHECK WHAT THE AI READ</div>
+        The AI can misread a cropped image (a 2 as a z, a minus as a plus). Fix anything wrong before it answers.
+        ${(t.unclear && t.unclear.length) ? '<br><span style="color:var(--amber);">Unclear to the AI: ' + escapeHtml(t.unclear.join('; ')) + '</span>' : ''}
+        <div class="stat-label" style="margin-top:12px;">QUESTION</div>
+        <textarea id="ws-tr-q" class="ws-edit" rows="4"></textarea>
+        <button class="go-btn" id="ws-tr-go">LOOKS RIGHT · SOLVE IT</button></div>`;
+      document.getElementById('ws-tr-q').value = t.question || '';
+      document.getElementById('ws-tr-go').addEventListener('click', async () => {
+        const question = document.getElementById('ws-tr-q').value.trim();
+        if(!question){ alert('There is no question to answer.'); return; }
+        revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 2 OF 2 · SOLVING</div><span id="ws-ai-take-text">Looking for a matching memo, then solving…</span></div>`;
+        const textEl = document.getElementById('ws-ai-take-text');
+        try{
+          // find memo excerpts most similar to the question (used to check the
+          // AI's own answer, never to evaluate the student)
+          let memoHits = [];
+          try{
+            const paperId = document.getElementById('ws-paper').value;
+            const paper = (store.papers || []).find(pp => pp.id === paperId);
+            const norm = x => String(x || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]+/g, ' ').trim();
+            let pool = (store.chunks || []).filter(c => c.category === 'Memos / Answers' && Array.isArray(c.embedding) && c.embedding.length);
+            if(paper){
+              const pn = norm(paper.name);
+              const same = pool.filter(c => { const mn = norm(c.name); return mn && pn && (pn.indexOf(mn) !== -1 || mn.indexOf(pn) !== -1); });
+              if(same.length) pool = same;
+            }
+            if(pool.length){
+              const qe = await embedText(question);
+              memoHits = pool.map(c => Object.assign({}, c, { score: dotProduct(qe, c.embedding) }))
+                .filter(c => c.score >= MIN_RELEVANT_SCORE)
+                .sort((x, y) => y.score - x.score).slice(0, 3);
+            }
+          }catch(memoErr){ console.error('memo search failed', memoErr); }
+
+          const memoContext = memoHits.length
+            ? 'OFFICIAL MEMO EXCERPTS (matched to the question by text similarity, so they may belong to a different question):\n\n' + memoHits.map((h, i) => '[' + (i+1) + '] ' + (h.name || h.src) + '\n' + h.text.slice(0, 1200)).join('\n\n')
+            : '';
+          const sPrompt = "You're a maths tutor. Solve the question below for a first-year student, showing working step by step, a few sentences unless it genuinely needs more.\n\nQUESTION (transcribed from a cropped image, confirmed by the student):\n" + question + "\n\n"
+            + (memoHits.length
+              ? "Official memo excerpts are provided. If they clearly correspond to this exact question, use them to check your final answer and say so. If they don't match, say so and ignore them.\n"
+              : "No memo is available for this question. Say plainly that your answer is unverified against an official memo.\n")
+            + "Use code to verify any calculations. End with a clear 'FINAL ANSWER:' line.";
+          let text = await runAi({ prompt: sPrompt, context: memoContext, codeExecution: true });
+          text += memoHits.length
+            ? '\n\n— Checked against ' + memoHits.length + ' memo excerpt(s) from: ' + Array.from(new Set(memoHits.map(h => h.name || h.src))).join(', ') + '. Excerpts are matched by similarity, so check they belong to this question. This is an AI-generated solution and can still be wrong.'
+            : '\n\n— No matching memo excerpt was found (upload the memo as a text PDF under Memos / Answers). This is the AI\'s own unverified solution. Check it against the memo.';
+
+          const chk = document.createElement('div');
+          chk.className = 'ai-check';
+          chk.textContent = 'AUTO-CHECK: re-checking the final result…';
+          textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+          textEl.parentElement.appendChild(chk);
+          const res = await autoCheckAnswer(question, text);
+          chk.className = 'ai-check ' + (res.status === 'ok' ? 'ok' : res.status === 'fail' ? 'bad' : '');
+          chk.textContent = 'AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
+        }catch(e){
+          textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
+        }
+      });
     }catch(e){
-      textEl.textContent = "Couldn't reach the AI: " + (e.message || e) + " — deploy api/lm-math-ai.js (same pattern as VAULT's /api/ai-curriculum-lab), or open this page on claude.ai.";
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Couldn't read the question: ${escapeHtml(e.message || String(e))}. If the AI backend isn't deployed, deploy api/lm-math-ai.js, or open this page on claude.ai.</div>`;
     }finally{
       btn.disabled = false;
     }
@@ -2213,13 +2360,7 @@
       }
       const context = hits.map((h, i) => '[' + (i+1) + '] ' + h.src + '\n' + h.text.slice(0, 1200)).join('\n\n');
       const prompt = "You're the AI Lab assistant inside LM Mathematics, a personal study system for a first-year mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step. Ground your answer in the provided excerpts from the student's own uploaded material when they're relevant, and say plainly when the material doesn't cover something. If no excerpts are provided, answer from general knowledge and do not claim to be using the student's material. If you are unsure of a result, say so rather than guessing.\n\nQuestion: " + q;
-      try{
-        answer = await lmMathAiRequest({ prompt, context });
-      }catch(apiErr){
-        if(!claudeSample) throw apiErr;
-        const result = await claudeSample(context ? prompt + '\n\nExcerpts from uploaded material:\n' + context : prompt, { modelTier: 'default', cache: false });
-        answer = result.text;
-      }
+      answer = await runAi({ prompt, context, codeExecution: true });
       if(hits.length){
         const names = Array.from(new Set(hits.map(h => h.name || h.src))).join(', ');
         answer += '\n\n— The AI was given ' + hits.length + ' excerpt(s) from your uploads (' + names + '). That does not guarantee the answer is correct. Verify against your memos.';
@@ -2246,6 +2387,16 @@
         this.classList.add('saved');
       }catch(e){ alert('Could not save note: ' + e.message); }
     });
+
+    // Independent re-check of the final result, done in your browser.
+    const chk = document.createElement('div');
+    chk.className = 'ai-check';
+    chk.textContent = 'AUTO-CHECK: re-checking the final result…';
+    div.insertBefore(chk, saveBtn);
+    const res = await autoCheckAnswer(q, answer);
+    chk.className = 'ai-check ' + (res.status === 'ok' ? 'ok' : res.status === 'fail' ? 'bad' : '');
+    chk.textContent = 'AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
+    answer += '\n\n— AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
   });
   document.getElementById('ai-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('ai-go').click(); });
 
