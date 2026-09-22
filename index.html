@@ -443,20 +443,28 @@
   .live-wrap{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; height:calc(100% - 90px); min-height:420px; }
   .live-feed-col{ display:flex; flex-direction:column; min-height:0; }
   .live-feed{ flex:1; min-height:0; overflow-y:auto; scroll-snap-type:y mandatory; border:1px solid var(--line); background:var(--panel); }
-  .live-card{ scroll-snap-align:start; min-height:100%; padding:26px 26px 22px; display:flex; flex-direction:column; justify-content:center; gap:14px; border-bottom:1px solid var(--line); }
-  .live-card-src{ font-size:10px; letter-spacing:1.5px; color:var(--amber); display:flex; justify-content:space-between; }
-  .live-card-title{ font-size:17px; line-height:1.5; color:var(--text); }
+  .live-card{ scroll-snap-align:start; min-height:100%; padding:26px 26px 22px 22px; display:flex; flex-direction:column; justify-content:center; gap:12px; border-bottom:1px solid var(--line); border-left:3px solid var(--live-accent, var(--amber)); }
+  .live-card-src{ font-size:10.5px; letter-spacing:1px; color:var(--dim); display:flex; align-items:center; gap:8px; }
+  .live-card-src img{ width:16px; height:16px; border-radius:3px; }
+  .live-card-src .lv-domain{ color:var(--text); font-weight:600; letter-spacing:.3px; }
+  .live-card-src .lv-tag{ color:var(--live-accent, var(--amber)); border:1px solid var(--live-accent, var(--amber)); padding:1px 7px; letter-spacing:.8px; }
+  .live-card-src .lv-time{ margin-left:auto; color:var(--dim); }
+  .live-card-title{ font-size:19px; line-height:1.45; color:var(--text); font-weight:500; }
   .live-card-title a{ color:inherit; text-decoration:none; }
   .live-card-title a:hover{ color:var(--amber-bright); }
-  .live-card-meta{ font-size:11px; color:var(--dim); display:flex; gap:14px; }
+  .live-card-meta{ font-size:11.5px; color:var(--dim); display:flex; gap:16px; }
   .live-feed-controls{ display:flex; gap:8px; margin-top:10px; justify-content:center; }
   .live-nav-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); width:42px; height:34px; cursor:pointer; font-size:13px; }
   .live-nav-btn:hover{ color:var(--amber); border-color:var(--amber); }
   .live-video-col{ min-height:0; overflow-y:auto; border:1px solid var(--line); background:var(--panel); padding:16px; }
-  .live-video-item{ margin-bottom:16px; }
-  .live-video-item iframe{ width:100%; aspect-ratio:16/9; border:0; display:block; }
-  .live-video-title{ font-size:11.5px; color:var(--text); margin-top:6px; line-height:1.4; }
-  .live-empty-note{ color:var(--dim); font-size:12px; line-height:1.7; padding:6px 2px; }
+  .live-video-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .live-video-tile{ position:relative; aspect-ratio:9/16; background:#000; overflow:hidden; cursor:pointer; border:1px solid var(--line); }
+  .live-video-tile img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.85; }
+  .live-video-tile:hover img{ opacity:1; }
+  .live-video-tile .lv-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.6); pointer-events:none; }
+  .live-video-tile .lv-vtitle{ position:absolute; left:0; right:0; bottom:0; padding:8px 8px 7px; font-size:10.5px; line-height:1.35; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.85)); }
+  .live-video-tile iframe{ width:100%; height:100%; border:0; display:block; }
+  .live-empty-note{ color:var(--dim); font-size:12px; line-height:1.7; padding:6px 2px; grid-column:1/-1; }
   .live-empty-note code{ color:var(--amber); }
 
   /* ============ OVERLAYS (About / Terms / Privacy) ============ */
@@ -2615,7 +2623,12 @@
   // genuinely live — no invented headlines). Right side is YouTube search,
   // which needs your own YOUTUBE_API_KEY on the backend; without it this
   // panel says so plainly rather than faking results.
-  const LIVE_DEFAULT_INTERESTS = ['AI', 'SpaceX Mars', 'Hugging Face', 'open source models'];
+  const LIVE_DEFAULT_INTERESTS = ['machine learning', 'deep learning', 'artificial intelligence', 'Hugging Face', 'SpaceX Mars'];
+  const LIVE_ACCENTS = ['#d99a2b', '#7fae6a', '#5c9ecf', '#b3492f', '#a879c9', '#c9a24a', '#4aa7a2'];
+  function liveAccentFor(tag){
+    let h = 0; for(let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    return LIVE_ACCENTS[h % LIVE_ACCENTS.length];
+  }
   function liveGetInterests(){
     try{
       const raw = localStorage.getItem('lm_live_interests');
@@ -2632,15 +2645,22 @@
     if(s < 86400) return Math.floor(s/3600) + 'h ago';
     return Math.floor(s/86400) + 'd ago';
   }
+  function liveDomain(url){
+    try{ return new URL(url).hostname.replace(/^www\./, ''); }catch(e){ return ''; }
+  }
   function renderLiveInterests(){
     const interests = liveGetInterests();
     const wrap = document.getElementById('live-interests');
-    wrap.innerHTML = interests.map((it, i) => `<div class="live-chip">${escapeHtml(it)}<span class="x" data-i="${i}">✕</span></div>`).join('')
-      + '<div class="live-add"><input id="live-add-input" placeholder="+ add interest…" maxlength="40"></div>';
+    wrap.innerHTML = interests.map((it, i) => `<div class="live-chip" style="border-color:${liveAccentFor(it)};color:${liveAccentFor(it)};">${escapeHtml(it)}<span class="x" data-i="${i}">✕</span></div>`).join('')
+      + '<div class="live-add"><input id="live-add-input" placeholder="+ add interest…" maxlength="40"></div>'
+      + '<span id="live-reset" style="font-size:10.5px;color:var(--dim);cursor:pointer;text-decoration:underline;margin-left:4px;">reset to defaults</span>';
     wrap.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => {
       const arr = liveGetInterests(); arr.splice(Number(x.dataset.i), 1);
       liveSetInterests(arr); renderLiveInterests(); liveFetchFeed(); liveFetchVideos();
     }));
+    document.getElementById('live-reset').addEventListener('click', () => {
+      liveSetInterests(LIVE_DEFAULT_INTERESTS.slice()); renderLiveInterests(); liveFetchFeed(); liveFetchVideos();
+    });
     const input = document.getElementById('live-add-input');
     input.addEventListener('keydown', e => {
       if(e.key === 'Enter' && input.value.trim()){
@@ -2672,19 +2692,28 @@
       items.sort((a, b) => b.created - a.created);
       items = items.slice(0, 40);
       if(!items.length){ feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">No recent Hacker News results for these interests right now. Try different terms.</div></div>'; return; }
-      feed.innerHTML = items.map(it => `
-        <div class="live-card">
-          <div class="live-card-src"><span>HACKER NEWS · ${escapeHtml(it.q).toUpperCase()}</span><span>${liveTimeAgo(it.created)}</span></div>
+      feed.innerHTML = items.map(it => {
+        const domain = liveDomain(it.url);
+        const accent = liveAccentFor(it.q);
+        return `
+        <div class="live-card" style="--live-accent:${accent};">
+          <div class="live-card-src">
+            ${domain ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <span class="lv-domain">${escapeHtml(domain || 'news.ycombinator.com')}</span>
+            <span class="lv-tag">${escapeHtml(it.q)}</span>
+            <span class="lv-time">${liveTimeAgo(it.created)}</span>
+          </div>
           <div class="live-card-title"><a href="${it.url}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a></div>
-          <div class="live-card-meta"><span>▲ ${it.points}</span><span>💬 ${it.comments}</span></div>
-        </div>`).join('');
+          <div class="live-card-meta"><span>▲ ${it.points} points</span><span>💬 ${it.comments} comments</span></div>
+        </div>`;
+      }).join('');
     }catch(e){
       feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Couldn\'t load the live feed: ' + escapeHtml(e.message || String(e)) + '</div></div>';
     }
   }
   async function liveFetchVideos(){
     const wrap = document.getElementById('live-videos');
-    wrap.innerHTML = '<div class="live-empty-note">Loading videos…</div>';
+    wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Loading videos…</div></div>';
     const interests = liveGetInterests();
     try{
       const r = await fetch('/api/lm-feed-videos', {
@@ -2693,18 +2722,27 @@
       });
       const data = await r.json().catch(() => ({}));
       if(!r.ok || data.notConfigured){
-        wrap.innerHTML = '<div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div>';
+        wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div></div>';
         return;
       }
       const vids = data.videos || [];
-      if(!vids.length){ wrap.innerHTML = '<div class="live-empty-note">No videos found for these interests right now.</div>'; return; }
-      wrap.innerHTML = vids.map(v => `
-        <div class="live-video-item">
-          <iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}" title="${escapeHtml(v.title)}" allowfullscreen loading="lazy"></iframe>
-          <div class="live-video-title">${escapeHtml(v.title)} <span style="color:var(--dim);">— ${escapeHtml(v.channel || '')}</span></div>
-        </div>`).join('');
+      if(!vids.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">No videos found for these interests right now.</div></div>'; return; }
+      // Thumbnail grid, TikTok-Shorts style: nothing plays until tapped, so
+      // we're not loading a dozen iframes at once.
+      wrap.innerHTML = '<div class="live-video-grid">' + vids.map((v, i) => `
+        <div class="live-video-tile" data-i="${i}">
+          <img src="${escapeHtml(v.thumbnail || '')}" alt="" loading="lazy">
+          <div class="lv-play">▶</div>
+          <div class="lv-vtitle">${escapeHtml(v.title)}<br><span style="opacity:.75;">${escapeHtml(v.channel || '')}</span></div>
+        </div>`).join('') + '</div>';
+      wrap.querySelectorAll('.live-video-tile').forEach(tile => {
+        tile.addEventListener('click', () => {
+          const v = vids[Number(tile.dataset.i)];
+          tile.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+        }, { once: true });
+      });
     }catch(e){
-      wrap.innerHTML = '<div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div>';
+      wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div></div>';
     }
   }
   let liveWired = false;
