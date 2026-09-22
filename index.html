@@ -2732,6 +2732,24 @@
     }, { once: true });
     return el;
   }
+  // Trickles tiles into the grid one at a time instead of the whole batch
+  // landing at once — same infinite grid, just a smoother, continuous feed.
+  function appendTilesStaggered(grid, vids, delay){
+    delay = delay || 90;
+    return new Promise(resolve => {
+      if(!vids.length){ resolve(); return; }
+      let i = 0;
+      (function next(){
+        if(i >= vids.length){ resolve(); return; }
+        const v = vids[i++];
+        if(document.body.contains(grid)){
+          liveVideoSeen.add(v.videoId);
+          grid.appendChild(liveVideoTileEl(v));
+        }
+        setTimeout(next, delay);
+      })();
+    });
+  }
   async function liveVideoRequest(interests, pageTokens){
     const r = await fetch('/api/lm-feed-videos', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2758,10 +2776,11 @@
       interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
       if(!vids.length){ wrap.innerHTML = '<div class="live-video-grid"><div class="live-empty-note">No videos found for these interests right now.</div></div>'; return; }
       // Thumbnail grid, TikTok-Shorts style: nothing plays until tapped, so
-      // we're not loading a dozen iframes at once.
+      // we're not loading a dozen iframes at once. Tiles trickle in one at
+      // a time rather than the whole batch appearing together.
       wrap.innerHTML = '<div class="live-video-grid" id="live-video-grid"></div>';
       const grid = document.getElementById('live-video-grid');
-      vids.forEach(v => { liveVideoSeen.add(v.videoId); grid.appendChild(liveVideoTileEl(v)); });
+      await appendTilesStaggered(grid, vids);
       if(!liveVideoScrollWired){
         liveVideoScrollWired = true;
         wrap.addEventListener('scroll', () => {
@@ -2800,7 +2819,7 @@
       liveVideoTokens = Object.assign({}, liveVideoTokens, data.nextPageTokens || {});
       interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
       const fresh = (data.videos || []).filter(v => !liveVideoSeen.has(v.videoId));
-      fresh.forEach(v => { liveVideoSeen.add(v.videoId); grid.appendChild(liveVideoTileEl(v)); });
+      await appendTilesStaggered(grid, fresh);
     }catch(e){
       loading.textContent = 'Could not load more: ' + (e.message || e);
     }finally{
