@@ -1023,6 +1023,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
+          context: opts.context || '',
           images,
           codeExecution: opts.codeExecution !== false,
           thinking: opts.thinking || 'high'
@@ -1070,6 +1071,8 @@
 
   let zCounter = 10;
   let currentUid = null;
+  let lmProfile = null;      // signed-in student's profile (name, degree, institution, module)
+  const lmAiHistory = [];    // this session's AI Lab Q&A, so follow-up questions have context
 
   function openPage(id){
     const el = document.getElementById(id);
@@ -1238,6 +1241,7 @@
           const doc = await db.collection(PROFILE_COLLECTION).doc(user.uid).get();
           profile = doc.exists ? doc.data() : null;
         }catch(e){ console.error('could not load profile', e); }
+        lmProfile = profile;
         const name = profile && profile.name ? profile.name : '';
         const mod = profile && profile.module ? profile.module : 'Mathematics';
         document.getElementById('dash-user').textContent = (name ? name + ' · ' : '') + mod;
@@ -1246,6 +1250,8 @@
         renderOverview();
       } else {
         currentUid = null;
+        lmProfile = null;
+        lmAiHistory.length = 0;
         detachStoreListeners();
       }
     });
@@ -1269,8 +1275,10 @@
         const items = [];
         snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
         store[key] = items;
+        if(key === 'papers') lmBackfill();
         const activeTab = document.querySelector('.dash-tabs .tab.active');
-        if(activeTab && TAB_RENDER[activeTab.dataset.tab]) TAB_RENDER[activeTab.dataset.tab]();
+        // AI Lab doesn't depend on the store, and re-rendering it would wipe the answers on screen.
+        if(activeTab && activeTab.dataset.tab !== 'ailab' && TAB_RENDER[activeTab.dataset.tab]) TAB_RENDER[activeTab.dataset.tab]();
       }, err => console.error('store listener error', key, err));
     });
   }
@@ -1321,6 +1329,190 @@
     document.getElementById('ov-recent').innerHTML = recent.length ? recent.map(p => `<div class="file-row"><span class="file-tag">${escapeHtml(p.category)}</span><span class="file-name">${escapeHtml(p.name)}</span><span class="file-date">${fmtDate(p.addedAt)}</span></div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
   }
 
+  // ============ LIBRARY KNOWLEDGE (what the AI knows about your uploads) ============
+  // On upload, readable files (PDFs with a text layer, .txt/.md/.tex etc.) have
+  // their text extracted in the browser and saved on the paper's Firestore doc
+  // (`text`). Older uploads are read once in the background. When you ask the AI
+  // Lab something, the best-matching excerpts plus the full file list are sent
+  // along with the question. Videos, images and scanned PDFs are name-only.
+  const LM_TEXT_EXTS = ['txt','md','tex','csv','json','py','js','java','c','cpp','r','m'];
+  const LM_MAX_TEXT = 150000; // chars kept per file (Firestore docs cap at 1 MiB)
+  const LM_STOP = new Set('the a an and or of to in on for with is are was were be by at as it this that from what how why which do does did can could would should i me my we you your explain show find solve about into than then there their them these those please give tell'.split(' '));
+  function lmExt(name){ const m = /\.([a-z0-9]+)$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+  function lmCanRead(name){ const e = lmExt(name); return e === 'pdf' || LM_TEXT_EXTS.includes(e); }
+
+  async function lmExtractText(source, name){
+    if(lmExt(name) === 'pdf'){
+      if(!window.pdfjsLib) return '';
+      const buf = await source.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      let out = '';
+      for(let p = 1; p <= pdf.numPages && out.length < LM_MAX_TEXT; p++){
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const t = tc.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('')
+          .replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+        if(t) out += '\n[p.' + p + '] ' + t;
+      }
+      return out.trim().slice(0, LM_MAX_TEXT);
+    }
+    return (await source.text()).slice(0, LM_MAX_TEXT);
+  }
+
+  // Read older uploads that don't have text yet, once each per session.
+  const lmAttempted = new Set();
+  let lmBackfilling = false;
+  async function lmBackfill(){
+    if(lmBackfilling || !db) return;
+    lmBackfilling = true;
+    try{
+      for(const p of store.papers.slice()){
+        if(p.indexedAt || lmAttempted.has(p.id) || !p.file_url || !lmCanRead(p.name)) continue;
+        lmAttempted.add(p.id);
+        try{
+          const r = await fetch(p.file_url);
+          if(!r.ok) continue;
+          const text = await lmExtractText(await r.blob(), p.name);
+          await db.collection(TRACKER_COLLECTIONS.papers).doc(p.id).update({ text, indexedAt: new Date().toISOString() });
+        }catch(e){ console.warn('could not read', p.name, e); }
+      }
+    } finally { lmBackfilling = false; }
+  }
+
+  function lmTokens(s){ return (String(s).toLowerCase().match(/[a-z0-9]{2,}/g) || []).filter(w => !LM_STOP.has(w)); }
+  function lmChunk(text){
+    const out = []; let cur = '';
+    for(const para of String(text).split(/\n+/)){
+      if(cur.length + para.length > 1200 && cur){ out.push(cur); cur = ''; }
+      cur += (cur ? '\n' : '') + para;
+      while(cur.length > 1800){ out.push(cur.slice(0, 1500)); cur = cur.slice(1350); } // small overlap
+    }
+    if(cur.trim()) out.push(cur);
+    return out;
+  }
+
+  // ---- Live snapshot of every tab (same idea as Vault's aiLabGatherContext) ----
+  function lmDaysUntil(dateStr){
+    const d = new Date(dateStr + 'T00:00:00'); const t = new Date(); t.setHours(0,0,0,0);
+    return Math.round((d - t) / 86400000);
+  }
+  function lmGatherAppContext(){
+    const L = [];
+    const now = new Date();
+    L.push('Today: ' + now.toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
+
+    // Profile
+    if(lmProfile){
+      const bits = [];
+      if(lmProfile.name) bits.push('name: ' + lmProfile.name);
+      if(lmProfile.degree) bits.push('degree: ' + lmProfile.degree);
+      if(lmProfile.institution) bits.push('institution: ' + lmProfile.institution);
+      if(lmProfile.module) bits.push('module: ' + lmProfile.module);
+      if(bits.length) L.push('Student — ' + bits.join(', '));
+    }
+
+    // Calendar (assessment dates)
+    const events = (store.events || []).filter(e => e && e.date).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const upcoming = events.filter(e => lmDaysUntil(e.date) >= 0).slice(0, 12);
+    const past = events.filter(e => lmDaysUntil(e.date) < 0).slice(-5);
+    L.push('\nCALENDAR — upcoming assessments:' + (upcoming.length
+      ? '\n' + upcoming.map(e => {
+          const n = lmDaysUntil(e.date);
+          return '- ' + e.date + ' (' + (n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days') + '): ' + e.name;
+        }).join('\n')
+      : ' none logged'));
+    if(past.length) L.push('Recent past dates:\n' + past.map(e => '- ' + e.date + ': ' + e.name).join('\n'));
+
+    // Quiz results
+    const attempts = (store.quizAttempts || []).filter(a => a && a.total).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if(attempts.length){
+      const avg = Math.round(attempts.reduce((t, a) => t + a.score / a.total, 0) / attempts.length * 100);
+      L.push('\nQUICK QUIZ — ' + attempts.length + ' attempt(s), average ' + avg + '%. Most recent (oldest→newest): ' +
+        attempts.slice(-8).map(a => a.score + '/' + a.total + ' on ' + String(a.date).slice(0, 10)).join(', ') +
+        '. (Only overall scores are recorded, not which topics were missed.)');
+    } else {
+      L.push('\nQUICK QUIZ — no attempts yet.');
+    }
+
+    // Upload coverage
+    const counts = {}; UPLOAD_CATS.forEach(c => counts[c] = 0);
+    (store.papers || []).forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+    L.push('\nUPLOAD COVERAGE — ' + UPLOAD_CATS.map(c => c + ': ' + counts[c]).join('; ') +
+      (UPLOAD_CATS.some(c => !counts[c]) ? '. Nothing uploaded under: ' + UPLOAD_CATS.filter(c => !counts[c]).join(', ') + '.' : '.'));
+
+    // Saved AI notes
+    const notes = (store.aiNotes || []).slice(-6);
+    if(notes.length){
+      L.push('\nSAVED AI NOTES (' + (store.aiNotes || []).length + ' total; latest):\n' +
+        notes.map(n => '- Q: ' + String(n.q).slice(0, 140) + ' — A: ' + String(n.a).replace(/\s+/g, ' ').slice(0, 220) + '…').join('\n'));
+    }
+
+    // Workspace state
+    try{
+      const sel = document.getElementById('ws-paper');
+      const paper = sel && sel.value ? (store.papers || []).find(p => p.id === sel.value) : null;
+      const ws = [];
+      ws.push(paper ? 'paper selected: "' + paper.name + '" (' + paper.category + ')' : 'no paper selected');
+      ws.push(wsGrabbedImageBlob ? 'a question segment is grabbed' : 'no question segment grabbed');
+      ws.push('study timer: ' + wsFormatTime(Math.max(0, wsTimerRemaining)) + ' remaining of ' + Math.round(wsTimerTotal / 60) + ' min' + (wsTimerRunning ? ' (running)' : ' (paused)'));
+      L.push('\nWORKSPACE — ' + ws.join('; ') + '.');
+    }catch(e){}
+
+    // Earlier questions in this AI Lab session
+    if(lmAiHistory.length){
+      L.push('\nEARLIER IN THIS AI LAB SESSION (oldest→newest):\n' + lmAiHistory.slice(-4).map(h =>
+        'Q: ' + String(h.q).slice(0, 200) + '\nA: ' + String(h.a).replace(/\s+/g, ' ').slice(0, 500) + (String(h.a).length > 500 ? '…' : '')).join('\n\n'));
+    }
+    return L.join('\n');
+  }
+
+  // Keyword retrieval (IDF-weighted) over every readable file, plus the live snapshot above.
+  // Returns { text, sources }.
+  function lmBuildContext(question){
+    const papers = store.papers || [];
+    const snapshot = "LIVE SNAPSHOT OF THE STUDENT'S LM TRACKER (as of right now):\n" + lmGatherAppContext();
+
+    const library = papers.length
+      ? papers.slice(0, 80).map(p => '- [' + p.category + '] ' + p.name + ' (' + (p.text ? 'readable' : 'name only') + ')').join('\n')
+      : '(nothing uploaded yet)';
+
+    const chunks = [];
+    papers.filter(p => p.text).forEach(p => {
+      const nameToks = new Set(lmTokens(p.name));
+      lmChunk(p.text).forEach(c => {
+        const toks = lmTokens(c); const tf = {};
+        toks.forEach(t => tf[t] = (tf[t] || 0) + 1);
+        chunks.push({ p, c, tf, nameToks });
+      });
+    });
+    const df = {};
+    chunks.forEach(ch => Object.keys(ch.tf).forEach(t => df[t] = (df[t] || 0) + 1));
+    const qToks = Array.from(new Set(lmTokens(question)));
+    const N = chunks.length || 1;
+    chunks.forEach(ch => {
+      let score = 0;
+      qToks.forEach(t => {
+        if(ch.tf[t]) score += Math.min(ch.tf[t], 3) * Math.log(1 + N / (1 + (df[t] || 0)));
+        if(ch.nameToks.has(t)) score += 1.5;
+      });
+      ch.score = score;
+    });
+    const picked = []; const perFile = {};
+    chunks.filter(ch => ch.score > 0).sort((a, b) => b.score - a.score).forEach(ch => {
+      if(picked.length >= 6 || (perFile[ch.p.id] || 0) >= 3) return;
+      perFile[ch.p.id] = (perFile[ch.p.id] || 0) + 1;
+      picked.push(ch);
+    });
+
+    let text = snapshot +
+      "\n\nTHE STUDENT'S LM LIBRARY — everything they have uploaded. Files marked 'name only' have no readable text (videos, images, scanned pages), so all you know about them is the title:\n" + library;
+    if(picked.length){
+      text += '\n\nRELEVANT EXCERPTS FROM THEIR FILES:\n' + picked.map(ch =>
+        '--- from "' + ch.p.name + '" (' + ch.p.category + ') ---\n' + ch.c).join('\n\n');
+    }
+    return { text, sources: Array.from(new Set(picked.map(ch => ch.p.name))) };
+  }
+
   // ============ UPLOAD ============
   function renderUpload(){
     document.getElementById('cat-choice').innerHTML = UPLOAD_CATS.map(c => `<button class="cat-btn ${c===activeCat?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
@@ -1333,6 +1525,7 @@
       <div class="file-row">
         <span class="file-tag">${escapeHtml(p.category)}</span>
         <span class="file-name">${p.file_url ? `<a href="${escapeHtml(p.file_url)}" target="_blank" rel="noopener" style="color:inherit;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</span>
+        <span class="file-date" title="Whether the AI can read this file's contents">${p.text ? 'AI: READ' : (lmCanRead(p.name) ? (p.indexedAt ? 'AI: NO TEXT' : 'AI: READING\u2026') : 'AI: NAME ONLY')}</span>
         <span class="file-date">${fmtDate(p.addedAt)}</span>
         <span class="file-remove" data-remove="${p.id}">remove</span>
       </div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
@@ -1359,9 +1552,16 @@
         const { error: upErr } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, f, { upsert:false });
         if(upErr) throw upErr;
         const { data: urlData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+        const extra = {};
+        if(lmCanRead(f.name)){
+          label.textContent = 'reading ' + f.name + '\u2026';
+          try{ extra.text = await lmExtractText(f, f.name); extra.indexedAt = new Date().toISOString(); }
+          catch(e){ console.warn('could not read', f.name, e); }
+        }
         await db.collection(TRACKER_COLLECTIONS.papers).add({
           uid: currentUid, name: f.name, category: activeCat,
-          addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path
+          addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path,
+          ...extra
         });
       }catch(e){
         alert('Could not upload "' + f.name + '": ' + (e.message || e));
@@ -2004,14 +2204,24 @@
 
     goBtn.disabled = true;
     let answer = '';
+    const ctx = lmBuildContext(q);
     try{
-      const prompt = `You're the AI Lab assistant inside LM, a mathematics study platform for a first-year Applied Mathematics student at university level. If the question involves any calculation, proof, or derivation, work through it fully and rigorously yourself first — every algebraic/calculus step written out explicitly and re-checked before you move on, exactly as a careful mathematician marking their own work would. Show the complete working, not just the result, and state the final answer plainly at the end. If the question is conceptual rather than computational, explain it clearly and precisely instead. Accuracy matters far more than brevity — take the space a correct, complete answer needs.\n\nQuestion: ${q}`;
+      const prompt = `You're the AI Lab assistant inside LM, a mathematics study platform for a first-year Applied Mathematics student at university level. If the question involves any calculation, proof, or derivation, work through it fully and rigorously yourself first — every algebraic/calculus step written out explicitly and re-checked before you move on, exactly as a careful mathematician marking their own work would. Show the complete working, not just the result, and state the final answer plainly at the end. If the question is conceptual rather than computational, explain it clearly and precisely instead. Accuracy matters far more than brevity — take the space a correct, complete answer needs.\n\nA live snapshot of the student's LM tracker is provided above (profile, today's date, calendar, quiz results, uploads, saved notes, workspace state, earlier questions this session), along with excerpts from their files most relevant to this question. Use it whenever the question is about their progress, deadlines, material or earlier questions, and name the file you drew on. Never invent tracker data that isn't in the snapshot — if it isn't there, say so plainly. For pure maths questions the snapshot can be ignored.\n\nQuestion: ${q}`;
       const result = await lmAi(prompt, {
+        context: ctx.text,
         codeExecution: true,
         thinking: 'high'
       });
       answer = result.text;
+      lmAiHistory.push({ q, a: answer }); if(lmAiHistory.length > 8) lmAiHistory.shift();
       textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
+      if(ctx.sources.length){
+        const src = document.createElement('div');
+        src.className = 'ai-sources';
+        src.style.cssText = 'margin-top:12px;font-size:10px;letter-spacing:1px;color:var(--dim);';
+        src.textContent = 'DREW ON: ' + ctx.sources.join('  \u00b7  ');
+        div.appendChild(src);
+      }
     }catch(e){
       textEl.textContent = wsAiErrorCopy(e);
       goBtn.disabled = false;
