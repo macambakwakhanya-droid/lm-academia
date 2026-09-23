@@ -1035,7 +1035,8 @@
     if(!r.ok){
       const err = new Error('[' + r.status + '] ' + ((data && data.error) || r.statusText || 'request failed'));
       err.status = r.status;
-      err.code = (r.status === 429 || /quota|rate|resource_exhausted/i.test(err.message)) ? 'rate_limited'
+      err.code = (r.status === 503 || /high demand|overloaded/i.test(err.message)) ? 'busy'
+               : (r.status === 429 || /quota|rate|resource_exhausted/i.test(err.message)) ? 'rate_limited'
                : (r.status === 413) ? 'too_large'
                : (r.status === 404 || r.status === 405) ? 'endpoint_missing'
                : 'server';
@@ -1049,6 +1050,7 @@
 
   function wsAiErrorCopy(e){
     switch(e && e.code){
+      case 'busy': return "Google's free AI is overloaded right now (all fallback models too) — wait a few seconds and try again.";
       case 'rate_limited': return "The free AI quota is used up for the moment — give it a minute and try again.";
       case 'too_large': return "That image is too large to send — grab a smaller segment.";
       case 'endpoint_missing': return "The AI endpoint wasn't found. Check LM_AI_ENDPOINT points at your Vercel /api/lm-math-ai function.";
