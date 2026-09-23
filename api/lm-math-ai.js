@@ -15,6 +15,13 @@
 //   GEMINI_MODEL   (optional, default 'gemini-3.8-flash'; 'gemini-3.6-flash' also works)
 
 const DEFAULT_MODEL = 'gemini-3.8-flash';
+// If the primary model is overloaded (503/429) or missing, try these in order.
+const FALLBACK_MODELS = ['gemini-3.7-flash', 'gemini-3.6-flash'];
+
+// Thinking + code execution can take a while; ask Vercel for a longer limit.
+export const config = { maxDuration: 60 };
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function handler(req, res) {
   // CORS headers must be on EVERY response, not just the preflight, or a
@@ -44,7 +51,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const primary = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const models = [primary, ...FALLBACK_MODELS.filter(m => m !== primary)];
   const level = ['low', 'medium', 'high'].includes(thinking) ? thinking : 'high';
 
   const parts = [];
@@ -76,7 +84,7 @@ export default async function handler(req, res) {
     return body;
   }
 
-  async function callGemini(body) {
+  async function callGemini(model, body) {
     const r = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/' +
         encodeURIComponent(model) +
@@ -94,17 +102,35 @@ export default async function handler(req, res) {
     return { r, data };
   }
 
-  try {
-    let { r, data } = await callGemini(buildBody(true));
+  const isOverloaded = (r, data) =>
+    r.status === 429 || r.status === 500 || r.status === 503 || r.status === 504 ||
+    /high demand|overloaded|unavailable|try again later/i.test(data?.error?.message || '');
 
-    // If the API rejects the thinking setting for this model, retry without it
-    // rather than failing the whole request.
-    if (!r.ok && r.status === 400 && /think/i.test(data?.error?.message || '')) {
-      ({ r, data } = await callGemini(buildBody(false)));
+  async function callWithFallback() {
+    let last = null;
+    for (const m of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let { r, data } = await callGemini(m, buildBody(true));
+        // If the API rejects the thinking setting for this model, retry without it.
+        if (!r.ok && r.status === 400 && /think/i.test(data?.error?.message || '')) {
+          ({ r, data } = await callGemini(m, buildBody(false)));
+        }
+        last = { r, data, model: m };
+        if (r.ok) return last;
+        if (r.status === 404) break;                 // model not available: next model
+        if (!isOverloaded(r, data)) return last;     // real error (bad request etc.): stop
+        if (attempt === 0) await sleep(1500);        // brief pause, then one retry
+      }
     }
+    return last;
+  }
+
+  try {
+    const { r, data, model } = await callWithFallback();
 
     if (!r.ok) {
-      return res.status(r.status === 429 ? 429 : 502).json({
+      const status = r.status === 429 ? 429 : isOverloaded(r, data) ? 503 : 502;
+      return res.status(status).json({
         error: data?.error?.message || `Gemini request failed (${r.status})`
       });
     }
