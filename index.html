@@ -1030,13 +1030,14 @@
       });
       data = await r.json().catch(() => ({}));
     }catch(e){
-      const err = new Error('network'); err.code = 'network'; throw err;
+      const err = new Error('network: ' + (e && e.message)); err.code = 'network'; throw err;
     }
     if(!r.ok){
-      const err = new Error((data && data.error) || ('HTTP ' + r.status));
+      const err = new Error('[' + r.status + '] ' + ((data && data.error) || r.statusText || 'request failed'));
+      err.status = r.status;
       err.code = (r.status === 429 || /quota|rate|resource_exhausted/i.test(err.message)) ? 'rate_limited'
                : (r.status === 413) ? 'too_large'
-               : (r.status === 404) ? 'endpoint_missing'
+               : (r.status === 404 || r.status === 405) ? 'endpoint_missing'
                : 'server';
       throw err;
     }
@@ -1052,8 +1053,8 @@
       case 'too_large': return "That image is too large to send — grab a smaller segment.";
       case 'endpoint_missing': return "The AI endpoint wasn't found. Check LM_AI_ENDPOINT points at your Vercel /api/lm-math-ai function.";
       case 'empty_completion': return "The AI didn't return anything — try again.";
-      case 'network': return "Couldn't reach the AI — check your connection and try again.";
-      default: return "Couldn't reach the AI just now — try again in a moment.";
+      case 'network': return "Couldn't reach " + LM_AI_ENDPOINT + " (" + ((e && e.message) || 'network error') + "). Wrong URL, or a CORS block if the page and the API are on different domains.";
+      default: return "AI request failed: " + ((e && e.message) || 'unknown error');
     }
   }
 
