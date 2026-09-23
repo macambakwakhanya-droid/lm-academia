@@ -59,8 +59,8 @@ export default async function handler(req, res) {
   if (context) {
     parts.push({
       text:
-        "Excerpts from the student's own uploaded material. " +
-        'Use these when relevant:\n\n' +
+        "The student's own LM tracker data (profile, calendar, quiz results, uploaded library, saved notes, workspace state, earlier questions). " +
+        'Use it when relevant, and ignore it when it is not:\n\n' +
         String(context)
     });
   }
