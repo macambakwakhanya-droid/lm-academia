@@ -17,10 +17,13 @@
 const DEFAULT_MODEL = 'gemini-3.8-flash';
 
 export default async function handler(req, res) {
+  // CORS headers must be on EVERY response, not just the preflight, or a
+  // browser on another origin (e.g. GitHub Pages) blocks the real reply.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(204).end();
   }
 
@@ -101,7 +104,7 @@ export default async function handler(req, res) {
     }
 
     if (!r.ok) {
-      return res.status(502).json({
+      return res.status(r.status === 429 ? 429 : 502).json({
         error: data?.error?.message || `Gemini request failed (${r.status})`
       });
     }
