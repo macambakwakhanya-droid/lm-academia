@@ -5,6 +5,7 @@
 <title>LM Mathematics — Personal System</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ29sZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmQ5OGEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI0NSUiIHN0b3AtY29sb3I9IiNkOTlhMmIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGE1ZTE0Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDAsMTAwKSI+CiAgICA8Y2lyY2xlIHI9IjkwIiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iOCIvPgogICAgPHBhdGggZD0iTS01MCAyMiBMLTI2IC0zNyBMMCA2IEwyNiAtMzcgTDUwIDIyIFoiCiAgICAgICAgICBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZ29sZCkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwvZz4KPC9zdmc+Cg==">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.2/math.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -399,6 +400,11 @@
   .ai-result{ border:1px solid var(--line); padding:18px 20px; max-width:640px; margin-bottom:10px; }
   .ai-result .ai-tag{ font-size:9.5px; letter-spacing:1.5px; color:var(--amber); margin-bottom:10px; }
   .ai-result .ai-text{ font-size:12.5px; color:var(--text); line-height:1.75; }
+  .ai-check{ margin-top:12px; padding:9px 12px; border:1px solid var(--line); font-size:11.5px; line-height:1.6; color:var(--dim); }
+  .ai-check.ok{ border-color:var(--ok); color:var(--ok); }
+  .ai-check.bad{ border-color:var(--danger); color:#e0876e; }
+  .ai-check code{ color:var(--text); }
+  .ws-edit{ width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line); font-family:inherit; font-size:12px; padding:8px 10px; margin:4px 0 12px; resize:vertical; }
   .ai-result .ai-save{ margin-top:14px; display:inline-block; font-size:10.5px; letter-spacing:1px; color:var(--dim); border:1px solid var(--line); padding:5px 11px; cursor:pointer; }
   .ai-result .ai-save:hover{ border-color:var(--amber); color:var(--amber-bright); }
   .ai-result .ai-save.saved{ border-color:var(--ok); color:var(--ok); cursor:default; }
@@ -409,11 +415,59 @@
   .note-card .note-del:hover{ color:var(--danger); }
 
   /* ---- explore ---- */
-  .explore-card{ border:1px solid var(--line); padding:26px 28px; max-width:600px; }
-  .explore-eyebrow{ display:flex; align-items:center; gap:8px; font-size:10px; letter-spacing:1.5px; color:var(--amber); margin-bottom:16px; }
-  .explore-eyebrow svg{ width:15px; height:15px; }
-  .explore-fact{ font-size:14px; color:var(--text); line-height:1.8; margin-bottom:20px; }
+  .explore-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .explore-chip{ border:1px solid var(--line); color:var(--dim); font-size:10.5px; letter-spacing:.5px; padding:6px 12px; cursor:pointer; user-select:none; white-space:nowrap; transition:border-color .15s,color .15s; }
+  .explore-chip:hover{ color:var(--text); border-color:var(--dim); }
+  .explore-chip.active{ color:var(--bg); background:var(--amber); border-color:var(--amber); }
+  .explore-chip .n{ opacity:.7; margin-left:5px; }
+  .explore-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; padding-bottom:8px; }
+  .explore-card{ border:1px solid var(--line); padding:0; display:flex; flex-direction:column; background:var(--panel); }
+  .explore-card.is-yours{ border-color:var(--amber); }
+  .explore-viz{ height:150px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; padding:10px; }
+  .explore-viz svg{ width:100%; height:100%; overflow:visible; }
+  .explore-body{ padding:16px 18px 18px; display:flex; flex-direction:column; gap:10px; flex:1; }
+  .explore-eyebrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:10px; letter-spacing:1.5px; color:var(--amber); }
+  .explore-eyebrow .yours-tag{ font-size:9px; letter-spacing:1px; border:1px solid var(--amber); color:var(--amber); padding:2px 6px; }
+  .explore-fact{ font-size:13px; color:var(--text); line-height:1.7; flex:1; }
   .explore-src{ font-size:10.5px; color:var(--dim); }
+  .explore-empty{ color:var(--dim); font-size:12.5px; padding:20px 2px; }
+
+  /* ---- live ---- */
+  .live-interests{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; align-items:center; }
+  .live-chip{ display:flex; align-items:center; gap:6px; border:1px solid var(--amber); color:var(--amber); font-size:11px; letter-spacing:.4px; padding:5px 6px 5px 11px; }
+  .live-chip .x{ cursor:pointer; color:var(--dim); padding:0 3px; }
+  .live-chip .x:hover{ color:var(--danger); }
+  .live-add{ display:flex; align-items:center; }
+  .live-add input{ background:transparent; border:1px dashed var(--line); color:var(--text); font-family:inherit; font-size:11px; padding:6px 10px; width:150px; }
+  .live-add input:focus{ outline:none; border-color:var(--amber); }
+  .live-wrap{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; height:calc(100% - 90px); min-height:420px; }
+  .live-feed-col{ display:flex; flex-direction:column; min-height:0; }
+  .live-feed{ flex:1; min-height:0; overflow-y:auto; scroll-snap-type:y mandatory; border:1px solid var(--line); background:var(--panel); }
+  .live-card{ scroll-snap-align:start; min-height:100%; padding:26px 26px 22px 22px; display:flex; flex-direction:column; justify-content:center; gap:12px; border-bottom:1px solid var(--line); border-left:3px solid var(--live-accent, var(--amber)); }
+  .live-card-src{ font-size:10.5px; letter-spacing:1px; color:var(--dim); display:flex; align-items:center; gap:8px; }
+  .live-card-src img{ width:16px; height:16px; border-radius:3px; }
+  .live-card-src .lv-domain{ color:var(--text); font-weight:600; letter-spacing:.3px; }
+  .live-card-src .lv-tag{ color:var(--live-accent, var(--amber)); border:1px solid var(--live-accent, var(--amber)); padding:1px 7px; letter-spacing:.8px; }
+  .live-card-src .lv-time{ margin-left:auto; color:var(--dim); }
+  .live-card-title{ font-size:19px; line-height:1.45; color:var(--text); font-weight:500; }
+  .live-card-title a{ color:inherit; text-decoration:none; }
+  .live-card-title a:hover{ color:var(--amber-bright); }
+  .live-card-meta{ font-size:11.5px; color:var(--dim); display:flex; gap:16px; }
+  .live-feed-controls{ display:flex; gap:8px; margin-top:10px; justify-content:center; }
+  .live-nav-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); width:42px; height:34px; cursor:pointer; font-size:13px; }
+  .live-nav-btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .live-video-col{ display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); background:var(--panel); }
+  .live-video-head{ padding:12px 14px 8px; font-size:10px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; flex-shrink:0; }
+  .live-video-feed{ flex:1; min-height:0; overflow-y:auto; scroll-snap-type:y mandatory; background:#000; }
+  .live-video-slide{ scroll-snap-align:start; scroll-snap-stop:always; height:100%; min-height:100%; position:relative; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; }
+  .lv-frame{ position:relative; width:100%; height:100%; }
+  .lv-frame img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.9; }
+  .lv-frame iframe{ width:100%; height:100%; border:0; display:block; }
+  .lv-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; color:#fff; text-shadow:0 1px 8px rgba(0,0,0,.7); pointer-events:none; }
+  .lv-vtitle{ position:absolute; left:0; right:0; bottom:0; padding:18px 18px 16px; font-size:13px; line-height:1.45; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.88)); }
+  .live-video-controls{ display:flex; gap:8px; justify-content:center; padding:8px; flex-shrink:0; }
+  .live-empty-note{ color:var(--dim); font-size:12px; line-height:1.7; padding:6px 2px; grid-column:1/-1; }
+  .live-empty-note code{ color:var(--amber); }
 
   /* ============ OVERLAYS (About / Terms / Privacy) ============ */
   .about-overlay{
@@ -429,6 +483,7 @@
   .about-back{ font-size:11px; color:var(--dim); margin-top:22px; display:inline-block; }
   .about-back:hover{ color:var(--amber-bright); }
 </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -589,6 +644,7 @@
     <div class="tab" data-tab="ainotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>LM AI Notes</div>
     <div class="tab" data-tab="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>LM Calendar</div>
     <div class="tab" data-tab="explore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16l7-3 9-9 2 2-9 9-3 7z"/><circle cx="6.5" cy="17.5" r="2.5"/></svg>LM Explore</div>
+    <div class="tab" data-tab="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>LM Live</div>
     <div class="tab" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>LM Progress</div>
   </div>
 
@@ -599,10 +655,16 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // PERSONAL SYSTEM</div>
         <div class="lm-heading">OVERVIEW</div>
-        <div class="lm-desc">Where you stand this semester — uploads, quiz average, and what's still missing.</div>
+        <div class="lm-desc">This semester so far — files you've uploaded, your sample-quiz average, and which categories are still empty.</div>
       </div>
       <div class="sec-title">This Semester, So Far</div>
       <div class="stat-row" id="ov-stats"></div>
+
+      <div class="sec-title">Due Today</div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">Spaced Repetition Queue</span></div>
+        <div class="panel-body" id="ov-due"></div>
+      </div>
 
       <div class="panel">
         <div class="panel-head"><span class="panel-title">What's Missing</span><span style="font-size:9.5px;letter-spacing:1.5px;color:var(--amber);">HEURISTIC — NOT A GUARANTEE</span></div>
@@ -692,7 +754,7 @@
         <div class="lm-heading">UPLOAD</div>
         <div class="lm-desc">Add papers, notes, and tutorials — sorted by category as you go.</div>
       </div>
-      <div class="sec-note">Files upload to your account's storage and sync across devices. The gaps/quiz/similar-questions logic below still runs on placeholder data until a real embedding pipeline reads your uploads.</div>
+      <div class="sec-note">Files upload to storage and sync across devices. They are opened through direct links, so if your storage bucket is public, anyone who has a file's link can open it. Only PDFs with selectable text are indexed (first 100 pages, in your browser). Scanned PDFs, images, videos and other formats are stored but are not searchable. Indexed text is used by Similar Questions and the AI Lab. It is not used by the workspace. Each file below shows its real indexing status. Upload answer memos under "Memos / Answers" to unlock VIEW ANSWER.</div>
       <div class="dropzone" id="dropzone">
         <div id="dropzone-label">drag files here, or click to browse</div>
         <input type="file" id="file-input" multiple style="display:none">
@@ -710,9 +772,9 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // SELF-CHECK</div>
         <div class="lm-heading">QUICK QUIZ</div>
-        <div class="lm-desc">Five questions to check where you actually stand right now.</div>
+        <div class="lm-desc">Five fixed sample questions on basic calculus. A quick warm-up, not a measure of where you stand.</div>
       </div>
-      <div class="sec-note">Sample questions below — once past papers are uploaded and processed, questions here will be drawn from your own material instead.</div>
+      <div class="sec-note">These five questions are fixed and hand-written. They are not generated from your uploads, and the quiz does not adapt to your material.</div>
       <div class="sec-title">Quick Quiz</div>
       <div class="quiz-card" id="quiz-card"></div>
     </div>
@@ -724,7 +786,7 @@
         <div class="lm-heading">SIMILAR QUESTIONS</div>
         <div class="lm-desc">Find past-paper questions that resemble the one in front of you.</div>
       </div>
-      <div class="sec-note">Matched with a real sentence-embedding model (MiniLM) running locally in the browser via transformers.js — the same approach as the SNISS embedding workspace. The corpus below is still a small demo set standing in for your own uploaded past papers, until that upload pipeline is wired in.</div>
+      <div class="sec-note">Matching uses a sentence-embedding model (MiniLM) running in your browser. Once at least 3 text chunks from your PDFs are indexed, search runs over your uploads, and results are excerpts of your files, not necessarily whole questions. Until then it searches a small built-in SAMPLE set. Those results are labelled SAMPLE and are not from your papers. The percentage is a similarity score, not a probability of being the same question.</div>
       <div class="sec-title">Similar Questions</div>
       <div class="sim-search">
         <input id="sim-input" type="text" placeholder="paste or type a question...">
@@ -753,9 +815,9 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // AI-ASSISTED</div>
         <div class="lm-heading">AI LAB</div>
-        <div class="lm-desc">Ask a question about your module and get a research-style answer.</div>
+        <div class="lm-desc">Ask a question about your module and get an AI-written answer.</div>
       </div>
-      <div class="sec-note">Ask something about your module. Answers below are placeholder — until this is wired to a real model reading what you've uploaded, this is a demo of the interaction, not real research.</div>
+      <div class="sec-note">Answers are written by an AI model and can contain mistakes. When relevant excerpts from your indexed uploads are found they are sent along, and the answer says which ones. Otherwise it says the answer comes from general knowledge. The model may run code for calculations when the backend allows it. If the final result is a derivative, integral, single-equation solution or number, this page then re-checks it itself with math.js and shows VERIFIED, MISMATCH or NOT CHECKED. That check is numeric and covers only the final result, not your explanation or a proof. Always check against your memos.</div>
       <div class="ai-prompt">
         <input id="ai-input" type="text" placeholder="ask the AI Lab something...">
         <button class="go-btn" id="ai-go">RESEARCH</button>
@@ -816,18 +878,39 @@
     <!-- ---- EXPLORE ---- -->
     <div class="tab-panel" id="panel-explore">
       <div class="lm-header">
-        <div class="lm-kicker">LM MATHEMATICS // DID YOU KNOW</div>
+        <div class="lm-kicker">LM MATHEMATICS // CONCEPTS</div>
         <div class="lm-heading">EXPLORE</div>
-        <div class="lm-desc">A bit of mathematical trivia to break up the session.</div>
+        <div class="lm-desc" id="explore-desc">Visual bites of the ideas behind your modules.</div>
       </div>
-      <div class="explore-card">
-        <div class="explore-eyebrow">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="3"/><path d="M10 15 21 6"/><path d="M18 3l3 3-3 3"/><path d="M14 10l1.5 1.5"/></svg>
-          DID YOU KNOW
+      <div class="explore-chips" id="explore-chips"></div>
+      <div class="explore-grid" id="explore-grid"></div>
+    </div>
+
+    <!-- ---- LIVE ---- -->
+    <div class="tab-panel" id="panel-live">
+      <div class="lm-header">
+        <div class="lm-kicker">LM MATHEMATICS // BREAK</div>
+        <div class="lm-heading">LIVE</div>
+        <div class="lm-desc">A break, not more studying. Real live results from Hacker News for whatever you're into. Swipe or scroll to move.</div>
+      </div>
+      <div class="live-interests" id="live-interests"></div>
+      <div class="live-wrap">
+        <div class="live-feed-col">
+          <div class="live-feed" id="live-feed"></div>
+          <div class="live-feed-controls">
+            <button class="live-nav-btn" id="live-up" title="Previous">▲</button>
+            <button class="live-nav-btn" id="live-refresh" title="Refresh">↻</button>
+            <button class="live-nav-btn" id="live-down" title="Next">▼</button>
+          </div>
         </div>
-        <div class="explore-fact" id="explore-fact"></div>
-        <div class="explore-src" id="explore-src"></div>
-        <button class="go-btn" id="explore-next" style="margin-top:20px;">SHOW ME ANOTHER</button>
+        <div class="live-video-col">
+          <div class="live-video-head">RELATED VIDEOS</div>
+          <div class="live-video-feed" id="live-videos"></div>
+          <div class="live-video-controls">
+            <button class="live-nav-btn" id="live-video-up" title="Previous video">▲</button>
+            <button class="live-nav-btn" id="live-video-down" title="Next video">▼</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -836,7 +919,7 @@
       <div class="lm-header">
         <div class="lm-kicker">LM MATHEMATICS // TRACK RECORD</div>
         <div class="lm-heading">PROGRESS</div>
-        <div class="lm-desc">Quiz scores over time, and what you've uploaded, by category.</div>
+        <div class="lm-desc">Sample-quiz scores over time, and what you've uploaded, by category.</div>
       </div>
       <div class="panel">
         <div class="panel-head"><span class="panel-title">Quiz Scores Over Time</span></div>
@@ -981,83 +1064,32 @@
     }
   }catch(e){ console.error('Firebase init failed', e); }
 
-  // ============ AI (Gemini via the /api/lm-math-ai Vercel function) ============
-  // The Gemini key never touches the browser. It lives in Vercel as
-  // GEMINI_API_KEY. If this page is NOT served from the same Vercel project
-  // as the api/ folder (e.g. GitHub Pages), set this to the full URL, e.g.
-  // 'https://your-project.vercel.app/api/lm-math-ai'
-  const LM_AI_ENDPOINT = '/api/lm-math-ai';
-
-  // Downscale + encode a Blob as a data: URL so it fits Vercel's ~4.5 MB
-  // request-body limit.
-  async function lmBlobToDataUrl(blob, maxDim){
-    maxDim = maxDim || 1600;
+  // ============ AI (Claude "sample" capability) ============
+  // Resolves once this view can actually run it; null on any other host —
+  // callers must design for absence rather than assuming it's there.
+  let claudeSample = null;
+  let claudeSampleLimits = null;
+  (async () => {
     try{
-      const bmp = await createImageBitmap(blob);
-      const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(bmp.width * scale));
-      c.height = Math.max(1, Math.round(bmp.height * scale));
-      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-      return c.toDataURL('image/png');
-    }catch(e){
-      return await new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(fr.result);
-        fr.onerror = () => reject(fr.error);
-        fr.readAsDataURL(blob);
-      });
-    }
-  }
-
-  // lmAi(prompt, { images: Blob[], codeExecution: bool, thinking: 'low'|'medium'|'high' })
-  // -> { text }. Throws an Error with .code on failure.
-  async function lmAi(prompt, opts){
-    opts = opts || {};
-    const images = [];
-    for(const b of (opts.images || [])){ if(b) images.push(await lmBlobToDataUrl(b)); }
-    let r, data;
-    try{
-      r = await fetch(LM_AI_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          context: opts.context || '',
-          images,
-          codeExecution: opts.codeExecution !== false,
-          thinking: opts.thinking || 'high'
-        })
-      });
-      data = await r.json().catch(() => ({}));
-    }catch(e){
-      const err = new Error('network: ' + (e && e.message)); err.code = 'network'; throw err;
-    }
-    if(!r.ok){
-      const err = new Error('[' + r.status + '] ' + ((data && data.error) || r.statusText || 'request failed'));
-      err.status = r.status;
-      err.code = (r.status === 503 || /high demand|overloaded/i.test(err.message)) ? 'busy'
-               : (r.status === 429 || /quota|rate|resource_exhausted/i.test(err.message)) ? 'rate_limited'
-               : (r.status === 413) ? 'too_large'
-               : (r.status === 404 || r.status === 405) ? 'endpoint_missing'
-               : 'server';
-      throw err;
-    }
-    if(!data || !data.text){
-      const err = new Error('empty'); err.code = 'empty_completion'; throw err;
-    }
-    return { text: data.text };
-  }
-
+      claudeSample = (window.claude && typeof window.claude.use === 'function')
+        ? await window.claude.use('sample') : null;
+      if(claudeSample){
+        claudeSampleLimits = await claudeSample.limits().catch(() => null);
+      }
+    }catch(e){ claudeSample = null; }
+  })();
   function wsAiErrorCopy(e){
     switch(e && e.code){
-      case 'busy': return "Google's free AI is overloaded right now (all fallback models too) — wait a few seconds and try again.";
-      case 'rate_limited': return "The free AI quota is used up for the moment — give it a minute and try again.";
-      case 'too_large': return "That image is too large to send — grab a smaller segment.";
-      case 'endpoint_missing': return "The AI endpoint wasn't found. Check LM_AI_ENDPOINT points at your Vercel /api/lm-math-ai function.";
+      case 'not_granted': return "AI access isn't allowed for this artifact right now.";
+      case 'sampling_disabled': return "AI isn't available for this account.";
+      case 'images_unavailable': return "This view can't send images to the AI yet.";
+      case 'image_rejected': return "Couldn't read one of the images — try grabbing the segment again.";
+      case 'rate_limited': return "Too many requests right now — give it a moment and try again.";
+      case 'session_expired': return "Please sign back in to use the AI.";
+      case 'refused': return "The AI declined to respond to that — try a different attempt.";
       case 'empty_completion': return "The AI didn't return anything — try again.";
-      case 'network': return "Couldn't reach " + LM_AI_ENDPOINT + " (" + ((e && e.message) || 'network error') + "). Wrong URL, or a CORS block if the page and the API are on different domains.";
-      default: return "AI request failed: " + ((e && e.message) || 'unknown error');
+      case 'cancelled': return 'Cancelled.';
+      default: return "Couldn't reach the AI just now — try again in a moment.";
     }
   }
 
@@ -1065,7 +1097,11 @@
     papers: 'tracker_papers',
     quizAttempts: 'tracker_quiz_attempts',
     aiNotes: 'tracker_ai_notes',
-    events: 'tracker_events'
+    events: 'tracker_events',
+    chunks: 'tracker_chunks',
+    mastery: 'tracker_mastery',
+    reviews: 'tracker_reviews',
+    activity: 'tracker_activity'
   };
   const PROFILE_COLLECTION = 'tracker_profiles';
 
@@ -1261,11 +1297,11 @@
   // DASHBOARD — state, tab switching, and per-tab rendering.
   // Data now lives in Firestore (tracker_* collections, scoped by uid)
   // with live onSnapshot listeners, and uploaded files go to Supabase
-  // Storage. Quiz questions, similar-question matches, and AI Lab
-  // answers below are still placeholder content until a real
-  // embedding/Gemini pipeline reads what's actually uploaded.
+  // Storage. NOTE: the Quick Quiz uses a fixed hand-written bank (not generated
+  // from uploads). Similar Questions and the AI Lab search indexed uploads
+  // when >= 3 chunks exist; otherwise they use a labelled SAMPLE set.
   // ============================================================
-  let store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+  let store = { papers: [], quizAttempts: [], aiNotes: [], events: [], chunks: [], mastery: [], reviews: [], activity: [] };
   let storeUnsubscribers = {};
 
   function attachStoreListeners(uid){
@@ -1275,30 +1311,362 @@
         const items = [];
         snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
         store[key] = items;
-        if(key === 'papers') lmBackfill();
         const activeTab = document.querySelector('.dash-tabs .tab.active');
-        // AI Lab doesn't depend on the store, and re-rendering it would wipe the answers on screen.
-        if(activeTab && activeTab.dataset.tab !== 'ailab' && TAB_RENDER[activeTab.dataset.tab]) TAB_RENDER[activeTab.dataset.tab]();
+        // AI Lab and Live don't depend on the store; re-rendering them would wipe the answers on screen
+        // (e.g. right after SAVE TO AI NOTES) and re-fetch the feeds / burn YouTube quota.
+        if(activeTab && activeTab.dataset.tab !== 'ailab' && activeTab.dataset.tab !== 'live' && TAB_RENDER[activeTab.dataset.tab]) TAB_RENDER[activeTab.dataset.tab]();
       }, err => console.error('store listener error', key, err));
     });
   }
   function detachStoreListeners(){
     Object.values(storeUnsubscribers).forEach(u => { try{ u(); }catch(e){} });
     storeUnsubscribers = {};
-    store = { papers: [], quizAttempts: [], aiNotes: [], events: [] };
+    store = { papers: [], quizAttempts: [], aiNotes: [], events: [], chunks: [], mastery: [], reviews: [], activity: [] };
   }
 
   function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch(e){ return ''; } }
 
-  const UPLOAD_CATS = ['Learning Objectives','Videos','Lecture Notes','Tutorials','My Work / Attempts'];
+  const UPLOAD_CATS = ['Learning Objectives','Videos','Lecture Notes','Tutorials','My Work / Attempts','Memos / Answers'];
   let activeCat = UPLOAD_CATS[0];
+
+  // ============================================================
+  // EXPANSION — real upload intelligence:
+  // PDF text extract → chunk → embed → index → search → mastery/SRS.
+  // AI calls go through /api/lm-math-ai (serverless, Gemini key
+  // server-side — same pattern as VAULT's /api/ai-curriculum-lab).
+  // ============================================================
+  function guessTopic(text){
+    const t = String(text || '').toLowerCase();
+    const topics = {
+      'Differentiation': ['derivative','differentiate','dy/dx','first principles','tangent','d/dx'],
+      'Integration': ['integrate','integral','by parts','substitution','antiderivative'],
+      'Related Rates': ['ladder','rate at which','slides','related rates','dv/dt','ds/dt'],
+      'Proofs': ['prove','induction','contradiction','theorem','lemma'],
+      'Series': ['series','converge','diverge','sum to infinity','ratio test','taylor'],
+      'Linear Algebra': ['matrix','eigen','determinant','vector space','linearly independent'],
+      'Probability': ['probability','random variable','distribution','variance','expected value']
+    };
+    let best = 'General', bestScore = 0;
+    Object.entries(topics).forEach(([topic, keys]) => {
+      const score = keys.reduce((a,k) => a + (t.includes(k) ? 1 : 0), 0);
+      if(score > bestScore){ bestScore = score; best = topic; }
+    });
+    return best;
+  }
+
+  function chunkText(text, max = 1200, overlap = 180){
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if(!clean) return [];
+    const sentences = clean.match(/[^.!?]+[.!?]+/g) || [clean];
+    const chunks = [];
+    let cur = '';
+    for(const s of sentences){
+      if((cur + ' ' + s).length > max && cur){
+        chunks.push(cur.trim());
+        cur = (overlap ? cur.slice(-overlap) + ' ' : '') + s;
+      } else {
+        cur = cur ? cur + ' ' + s : s;
+      }
+    }
+    if(cur.trim()) chunks.push(cur.trim());
+    return chunks.filter(Boolean);
+  }
+
+  async function extractPdfText(file){
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    let out = '';
+    const limit = Math.min(pdf.numPages, 100);
+    extractPdfText.lastInfo = { totalPages: pdf.numPages, pagesRead: limit };
+    for(let p = 1; p <= limit; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      out += content.items.map(i => i.str).join(' ') + '\n';
+    }
+    return out;
+  }
+
+  async function deleteChunksForPaper(paperId){
+    const snap = await db.collection(TRACKER_COLLECTIONS.chunks)
+      .where('uid','==',currentUid)
+      .where('paperId','==',paperId)
+      .get();
+    if(snap.empty) return;
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+
+  async function indexPaperFile(paper, file){
+    const text = await extractPdfText(file);
+    const info = extractPdfText.lastInfo || {};
+    if(text.trim().length < 200){
+      throw new Error('Not enough selectable text in this PDF. It may be scanned images.');
+    }
+    await deleteChunksForPaper(paper.id);
+    const chunks = chunkText(text);
+    try{
+    for(let i = 0; i < chunks.length; i++){
+      const c = chunks[i];
+      const topic = guessTopic(c);
+      const embedding = await embedText(c);
+      await db.collection(TRACKER_COLLECTIONS.chunks).add({
+        uid: currentUid,
+        paperId: paper.id,
+        category: paper.category,
+        name: paper.name,
+        src: paper.name + ' · ' + topic + ' · chunk ' + (i+1),
+        chunk: c.slice(0, 160),
+        text: c,
+        topic: topic,
+        embedding: embedding,
+        createdAt: new Date().toISOString()
+      });
+    }
+    }catch(err){
+      // don't leave half-indexed chunks behind
+      try{ await deleteChunksForPaper(paper.id); }catch(e){}
+      throw err;
+    }
+    await db.collection(TRACKER_COLLECTIONS.papers).doc(paper.id).update({
+      indexed: true,
+      indexError: '',
+      indexedAt: new Date().toISOString(),
+      textChars: text.length,
+      chunkCount: chunks.length,
+      pagesIndexed: info.pagesRead || null,
+      totalPages: info.totalPages || null
+    });
+  }
+
+  async function getCorpus(){
+    const real = (store.chunks || [])
+      .filter(c => Array.isArray(c.embedding) && c.embedding.length)
+      .map(c => ({ src: c.src || c.name, text: c.text, embedding: c.embedding, topic: c.topic || 'General', paperId: c.paperId, name: c.name, category: c.category, demo: false }));
+    if(real.length >= 3) return real;
+    await ensureSimBankEmbedded(); // fallback demo corpus
+    return SIM_BANK.map(s => ({ src: s.src, text: s.text, embedding: s.embedding, topic: guessTopic(s.text), demo: true }));
+  }
+  // Below this cosine similarity an excerpt is not treated as relevant.
+  const MIN_RELEVANT_SCORE = 0.3;
+
+  async function searchCorpus(query, topN = 3){
+    const corpus = await getCorpus();
+    const qe = await embedText(query);
+    return corpus
+      .map(c => Object.assign({}, c, { score: dotProduct(qe, c.embedding) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topN);
+  }
+
+  // ---- LM AI API (serverless, same pattern as VAULT's /api/ai-curriculum-lab) ----
+  async function lmMathAiRequest(payload){
+    const res = await fetch('/api/lm-math-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok){ const err = new Error(data.error || ('request failed: ' + res.status)); err.status = res.status; throw err; }
+    const text = (data.text || '').trim();
+    if(!text) throw new Error('empty response from AI API');
+    return text;
+  }
+
+  // One entry point for every AI call: your Vercel backend first, claude.ai fallback second.
+  // Keep image payloads under Vercel's ~4.5 MB request-body limit: shrink big crops before sending.
+  function lmShrinkImage(dataUrl, maxDim){
+    maxDim = maxDim || 1800;
+    return new Promise(resolve => {
+      if(typeof dataUrl !== 'string' || !/^data:image\//.test(dataUrl)) return resolve(dataUrl);
+      const img = new Image();
+      img.onload = () => {
+        const big = Math.max(img.width, img.height);
+        if(big <= maxDim && dataUrl.length < 2500000) return resolve(dataUrl);
+        const scale = Math.min(1, maxDim / big);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * scale));
+        c.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        let out = c.toDataURL('image/png');
+        if(out.length > 3000000) out = c.toDataURL('image/jpeg', 0.85);
+        resolve(out);
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
+  // Friendly text for an AI failure, showing the real reason.
+  function aiErrorText(e){
+    const msg = (e && e.message) || String(e);
+    if(e && (e.status === 404 || e.status === 405)) return "Couldn't find the AI endpoint (/api/lm-math-ai). Make sure api/lm-math-ai.js is deployed on the same Vercel project as this page. [" + msg + "]";
+    if(e && (e.status === 503 || /high demand|overloaded|unavailable/i.test(msg))) return "Google's free AI is overloaded right now (every fallback model too). Wait a few seconds and try again. [" + msg + "]";
+    if(e && (e.status === 429 || /quota|rate.?limit|resource_exhausted/i.test(msg))) return "The free AI quota is used up for the moment. Give it a minute and try again. [" + msg + "]";
+    if(e instanceof TypeError) return "Couldn't reach the AI backend (network or CORS problem). [" + msg + "]";
+    return "AI request failed: " + msg;
+  }
+
+  async function runAi({ prompt, context, images, json, codeExecution, thinking }){
+    images = await Promise.all((images || []).map(d => lmShrinkImage(d)));
+    try{
+      return await lmMathAiRequest({ prompt, context, images, json: !!json, codeExecution: !!codeExecution, thinking });
+    }catch(apiErr){
+      if(!claudeSample) throw apiErr;
+      const blobs = [];
+      for(const d of (images || [])){ blobs.push(await (await fetch(d)).blob()); }
+      const full = context ? prompt + '\n\nExcerpts from uploaded material:\n' + context : prompt;
+      const opts = { modelTier: 'default', cache: false };
+      if(blobs.length) opts.images = blobs;
+      const result = await claudeSample(full, opts);
+      return result.text;
+    }
+  }
+  function parseJsonLoose(text){
+    let t = String(text || '').replace(/```json|```/gi, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if(a === -1 || b === -1) throw new Error('no JSON found');
+    return JSON.parse(t.slice(a, b + 1));
+  }
+
+  // ---- automatic answer checker (runs in your browser with math.js) ----
+  // It re-checks the AI's FINAL result numerically. It cannot check proofs or explanations.
+  // math.js has no ln()/arcsin() etc., so map common aliases before parsing.
+  const mjFix = x => String(x).replace(/\bln\s*\(/g, 'log(').replace(/\barc(sin|cos|tan)\s*\(/g, 'a$1(');
+  const mjParse = x => math.parse(mjFix(x));
+  const mjEvaluate = x => math.evaluate(mjFix(x));
+  const CHECK_POINTS = [-2.3,-1.7,-0.9,-0.4,0.3,0.6,0.77,1.1,1.43,1.9,2.6,3.4];
+  function mjEval(node, scope){
+    try{ const v = node.evaluate(scope); return (typeof v === 'number' && isFinite(v)) ? v : null; }
+    catch(e){ return null; }
+  }
+  function mjClose(a, b, tol){ return Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b)); }
+  function checkDerivativeClaim(fStr, dStr, v){
+    const f = mjParse(fStr), d = mjParse(dStr);
+    const h = 1e-5;
+    let ok = 0; const bad = [];
+    for(const x of CHECK_POINTS){
+      const hi = mjEval(f, { [v]: x + h }), lo = mjEval(f, { [v]: x - h });
+      const claimed = mjEval(d, { [v]: x });
+      if(hi === null || lo === null || claimed === null) continue;
+      if(mjClose((hi - lo) / (2 * h), claimed, 1e-4)) ok++; else bad.push(x);
+    }
+    return { ok, bad };
+  }
+  function runAutoCheck(spec){
+    if(!window.math) return { status: 'unchecked', msg: 'the maths library did not load, so the answer was not re-checked.' };
+    if(!spec || !spec.kind || spec.kind === 'none') return { status: 'unchecked', msg: 'the final result is not a derivative, integral, single-equation solution or number, so it can\'t be re-checked automatically.' };
+    const v = /^[a-zA-Z]$/.test(spec.variable || '') ? spec.variable : 'x';
+    try{
+      if(spec.kind === 'derivative' || spec.kind === 'antiderivative'){
+        const isDer = spec.kind === 'derivative';
+        const r = isDer ? checkDerivativeClaim(spec.given, spec.claimed, v) : checkDerivativeClaim(spec.claimed, spec.given, v);
+        const desc = isDer ? ('d/d' + v + ' of ' + spec.given + ' = ' + spec.claimed) : ('the derivative of ' + spec.claimed + ' equals ' + spec.given);
+        if(r.bad.length) return { status: 'fail', msg: 'MISMATCH. Claim checked: ' + desc + '. It fails at ' + v + ' = ' + r.bad.slice(0,3).join(', ') + '.' };
+        if(r.ok < 4) return { status: 'unchecked', msg: 'too few valid test points to judge (' + r.ok + '). Claim: ' + desc + '.' };
+        return { status: 'ok', msg: 'VERIFIED numerically at ' + r.ok + ' test points. Claim checked: ' + desc + '. This is a numeric check, not a symbolic proof, and the expression was read from your question by the AI, so make sure it matches.' };
+      }
+      if(spec.kind === 'solve'){
+        const parts = String(spec.given).split('=');
+        if(parts.length !== 2) return { status: 'unchecked', msg: 'could not read the equation.' };
+        const g = mjParse('(' + parts[0] + ')-(' + parts[1] + ')');
+        const sols = Array.isArray(spec.claimed) ? spec.claimed : [spec.claimed];
+        const badS = []; let n = 0;
+        for(const sol of sols){
+          const val = Number(mjEvaluate(String(sol)));
+          const r = mjEval(g, { [v]: val });
+          if(!isFinite(val) || r === null) continue;
+          n++;
+          if(Math.abs(r) > 1e-6 * Math.max(1, Math.abs(val))) badS.push(sol);
+        }
+        if(!n) return { status: 'unchecked', msg: 'could not evaluate the proposed solutions.' };
+        if(badS.length) return { status: 'fail', msg: 'MISMATCH. These proposed solutions do NOT satisfy ' + spec.given + ': ' + badS.join(', ') + '.' };
+        return { status: 'ok', msg: 'VERIFIED. Each proposed solution (' + sols.join(', ') + ') satisfies ' + spec.given + '. This does not prove that no solutions were missed.' };
+      }
+      if(spec.kind === 'value'){
+        const a = Number(mjEvaluate(String(spec.given))), b = Number(mjEvaluate(String(spec.claimed)));
+        if(!isFinite(a) || !isFinite(b)) return { status: 'unchecked', msg: 'could not evaluate the value.' };
+        if(mjClose(a, b, 1e-6)) return { status: 'ok', msg: 'VERIFIED. ' + spec.given + ' evaluates to ' + a + ', matching the AI\'s ' + spec.claimed + '.' };
+        return { status: 'fail', msg: 'MISMATCH. ' + spec.given + ' evaluates to ' + a + ', but the AI claimed ' + spec.claimed + '.' };
+      }
+    }catch(e){
+      return { status: 'unchecked', msg: 'the check itself failed (' + (e.message || e) + '), so the answer was not re-checked.' };
+    }
+    return { status: 'unchecked', msg: 'unknown check type.' };
+  }
+  async function autoCheckAnswer(question, answer){
+    const prompt = "Below are a student's QUESTION and an AI's ANSWER. If the answer's key result is (a) a derivative, (b) an antiderivative, (c) the solution(s) of ONE equation in ONE variable, or (d) one numeric value, extract it for automatic checking. Use math.js syntax: ^ for powers, explicit * for multiplication, sqrt(), log() for natural log, exp(), sin(), cos(), tan(), pi, e. Never include '+ C'. 'given' must be the ORIGINAL expression/equation from the QUESTION. 'claimed' must be the FINAL result from the ANSWER (an array of strings for solve). Return ONLY JSON: {\"kind\":\"derivative\"|\"antiderivative\"|\"solve\"|\"value\"|\"none\",\"variable\":\"x\",\"given\":\"...\",\"claimed\":\"...\"}. Use kind \"none\" if it is not one of these.\n\nQUESTION:\n" + question + "\n\nANSWER:\n" + answer;
+    try{
+      const raw = await runAi({ prompt, json: true, thinking: 'low' });
+      return runAutoCheck(parseJsonLoose(raw));
+    }catch(e){
+      return { status: 'unchecked', msg: 'could not extract a checkable result (' + (e.message || e) + ').' };
+    }
+  }
+
+  function wsCanvasIsBlank(){
+    try{
+      const data = wsCtx.getImageData(0, 0, wsCanvas.width, wsCanvas.height).data;
+      for(let i = 3; i < data.length; i += 4){ if(data[i] !== 0) return false; }
+      return true;
+    }catch(e){ return true; }
+  }
+
+  // ---- spaced repetition / mastery ----
+  function nextDueDate(s){
+    s = s || {};
+    const reps = s.reps || 0, ease = s.ease || 2.5, lapses = s.lapses || 0;
+    const intervals = [0, 1, 2, 4, 7, 12, 20, 33, 54];
+    let days;
+    if(lapses >= 2){ days = 1; }
+    else { days = intervals[Math.min(reps, intervals.length - 1)] * Math.max(1, ease / 2.5); }
+    const d = new Date();
+    d.setDate(d.getDate() + Math.round(days));
+    return d.toISOString();
+  }
+
+  async function bumpMastery(topic, correct){
+    if(!fbReady || !currentUid || !topic) return;
+    const ref = db.collection(TRACKER_COLLECTIONS.mastery).doc(currentUid + '_' + topic);
+    const snap = await ref.get();
+    const old = snap.exists ? snap.data() : { reps: 0, ease: 2.5, lapses: 0, correct: 0, wrong: 0 };
+    const updated = {
+      uid: currentUid,
+      topic: topic,
+      reps: correct ? (old.reps || 0) + 1 : 0,
+      lapses: correct ? (old.lapses || 0) : (old.lapses || 0) + 1,
+      correct: (old.correct || 0) + (correct ? 1 : 0),
+      wrong: (old.wrong || 0) + (correct ? 0 : 1),
+      ease: correct ? Math.min(3.2, (old.ease || 2.5) + 0.12) : Math.max(1.3, (old.ease || 2.5) - 0.25),
+      dueAt: nextDueDate(old),
+      updatedAt: new Date().toISOString()
+    };
+    updated.accuracy = Math.round((updated.correct / Math.max(1, updated.correct + updated.wrong)) * 100);
+    await ref.set(updated, { merge: true });
+    await db.collection(TRACKER_COLLECTIONS.reviews).add({ uid: currentUid, topic: topic, correct: !!correct, at: new Date().toISOString() });
+  }
+
+  function renderDueList(){
+    const el = document.getElementById('ov-due');
+    if(!el) return;
+    const now = new Date().toISOString();
+    const due = (store.mastery || [])
+      .filter(m => (m.dueAt || '') <= now)
+      .sort((a, b) => (a.dueAt || '').localeCompare(b.dueAt || ''));
+    el.innerHTML = due.length
+      ? due.map(m => '<div class="file-row"><span class="file-tag">DUE</span><span class="file-name">' + escapeHtml(m.topic) + '</span><span class="file-date">' + (m.accuracy || 0) + '%</span></div>').join('')
+      : '<div class="empty-note">nothing due — nice</div>';
+  }
+
 
   // ---- tab switching ----
   const TAB_RENDER = {
     overview: renderOverview, workspace: renderWorkspace, upload: renderUpload, quiz: renderQuizStart, similar: renderSimilar,
     patterns: renderPatterns, ailab: renderAiLab, ainotes: renderAiNotes, calendar: renderCalendar,
-    explore: renderExplore, progress: renderProgress
+    explore: renderExplore, progress: renderProgress, live: renderLive
   };
   document.querySelectorAll('.dash-tabs .tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -1317,200 +1685,17 @@
     const total = store.papers.length;
     const avgQuiz = store.quizAttempts.length ? Math.round(store.quizAttempts.reduce((a,q)=>a+q.score/q.total,0)/store.quizAttempts.length*100) : null;
     document.getElementById('ov-stats').innerHTML = `
-      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">PAPERS UPLOADED</div></div>
-      <div class="stat-card"><div class="stat-num">${avgQuiz===null?'—':avgQuiz+'%'}</div><div class="stat-label">AVG QUIZ SCORE</div></div>
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">FILES UPLOADED</div></div>
+      <div class="stat-card"><div class="stat-num">${avgQuiz===null?'—':avgQuiz+'%'}</div><div class="stat-label">AVG SAMPLE-QUIZ SCORE</div></div>
       <div class="stat-card"><div class="stat-num">${store.events.length}</div><div class="stat-label">ASSESSMENTS LOGGED</div></div>
       <div class="stat-card"><div class="stat-num">${store.aiNotes.length}</div><div class="stat-label">AI NOTES SAVED</div></div>`;
     const missing = UPLOAD_CATS.filter(c => !counts[c]);
     document.getElementById('ov-gap').textContent = total===0
       ? " You haven't uploaded anything yet — start on the Upload tab and this will fill in."
       : (missing.length ? ` Nothing uploaded yet under: ${missing.join(', ')}.` : ' You have at least one upload in every category — nice.');
+    renderDueList();
     const recent = store.papers.slice(-5).reverse();
     document.getElementById('ov-recent').innerHTML = recent.length ? recent.map(p => `<div class="file-row"><span class="file-tag">${escapeHtml(p.category)}</span><span class="file-name">${escapeHtml(p.name)}</span><span class="file-date">${fmtDate(p.addedAt)}</span></div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
-  }
-
-  // ============ LIBRARY KNOWLEDGE (what the AI knows about your uploads) ============
-  // On upload, readable files (PDFs with a text layer, .txt/.md/.tex etc.) have
-  // their text extracted in the browser and saved on the paper's Firestore doc
-  // (`text`). Older uploads are read once in the background. When you ask the AI
-  // Lab something, the best-matching excerpts plus the full file list are sent
-  // along with the question. Videos, images and scanned PDFs are name-only.
-  const LM_TEXT_EXTS = ['txt','md','tex','csv','json','py','js','java','c','cpp','r','m'];
-  const LM_MAX_TEXT = 150000; // chars kept per file (Firestore docs cap at 1 MiB)
-  const LM_STOP = new Set('the a an and or of to in on for with is are was were be by at as it this that from what how why which do does did can could would should i me my we you your explain show find solve about into than then there their them these those please give tell'.split(' '));
-  function lmExt(name){ const m = /\.([a-z0-9]+)$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
-  function lmCanRead(name){ const e = lmExt(name); return e === 'pdf' || LM_TEXT_EXTS.includes(e); }
-
-  async function lmExtractText(source, name){
-    if(lmExt(name) === 'pdf'){
-      if(!window.pdfjsLib) return '';
-      const buf = await source.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-      let out = '';
-      for(let p = 1; p <= pdf.numPages && out.length < LM_MAX_TEXT; p++){
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const t = tc.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('')
-          .replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-        if(t) out += '\n[p.' + p + '] ' + t;
-      }
-      return out.trim().slice(0, LM_MAX_TEXT);
-    }
-    return (await source.text()).slice(0, LM_MAX_TEXT);
-  }
-
-  // Read older uploads that don't have text yet, once each per session.
-  const lmAttempted = new Set();
-  let lmBackfilling = false;
-  async function lmBackfill(){
-    if(lmBackfilling || !db) return;
-    lmBackfilling = true;
-    try{
-      for(const p of store.papers.slice()){
-        if(p.indexedAt || lmAttempted.has(p.id) || !p.file_url || !lmCanRead(p.name)) continue;
-        lmAttempted.add(p.id);
-        try{
-          const r = await fetch(p.file_url);
-          if(!r.ok) continue;
-          const text = await lmExtractText(await r.blob(), p.name);
-          await db.collection(TRACKER_COLLECTIONS.papers).doc(p.id).update({ text, indexedAt: new Date().toISOString() });
-        }catch(e){ console.warn('could not read', p.name, e); }
-      }
-    } finally { lmBackfilling = false; }
-  }
-
-  function lmTokens(s){ return (String(s).toLowerCase().match(/[a-z0-9]{2,}/g) || []).filter(w => !LM_STOP.has(w)); }
-  function lmChunk(text){
-    const out = []; let cur = '';
-    for(const para of String(text).split(/\n+/)){
-      if(cur.length + para.length > 1200 && cur){ out.push(cur); cur = ''; }
-      cur += (cur ? '\n' : '') + para;
-      while(cur.length > 1800){ out.push(cur.slice(0, 1500)); cur = cur.slice(1350); } // small overlap
-    }
-    if(cur.trim()) out.push(cur);
-    return out;
-  }
-
-  // ---- Live snapshot of every tab (same idea as Vault's aiLabGatherContext) ----
-  function lmDaysUntil(dateStr){
-    const d = new Date(dateStr + 'T00:00:00'); const t = new Date(); t.setHours(0,0,0,0);
-    return Math.round((d - t) / 86400000);
-  }
-  function lmGatherAppContext(){
-    const L = [];
-    const now = new Date();
-    L.push('Today: ' + now.toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
-
-    // Profile
-    if(lmProfile){
-      const bits = [];
-      if(lmProfile.name) bits.push('name: ' + lmProfile.name);
-      if(lmProfile.degree) bits.push('degree: ' + lmProfile.degree);
-      if(lmProfile.institution) bits.push('institution: ' + lmProfile.institution);
-      if(lmProfile.module) bits.push('module: ' + lmProfile.module);
-      if(bits.length) L.push('Student — ' + bits.join(', '));
-    }
-
-    // Calendar (assessment dates)
-    const events = (store.events || []).filter(e => e && e.date).slice().sort((a, b) => a.date.localeCompare(b.date));
-    const upcoming = events.filter(e => lmDaysUntil(e.date) >= 0).slice(0, 12);
-    const past = events.filter(e => lmDaysUntil(e.date) < 0).slice(-5);
-    L.push('\nCALENDAR — upcoming assessments:' + (upcoming.length
-      ? '\n' + upcoming.map(e => {
-          const n = lmDaysUntil(e.date);
-          return '- ' + e.date + ' (' + (n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days') + '): ' + e.name;
-        }).join('\n')
-      : ' none logged'));
-    if(past.length) L.push('Recent past dates:\n' + past.map(e => '- ' + e.date + ': ' + e.name).join('\n'));
-
-    // Quiz results
-    const attempts = (store.quizAttempts || []).filter(a => a && a.total).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    if(attempts.length){
-      const avg = Math.round(attempts.reduce((t, a) => t + a.score / a.total, 0) / attempts.length * 100);
-      L.push('\nQUICK QUIZ — ' + attempts.length + ' attempt(s), average ' + avg + '%. Most recent (oldest→newest): ' +
-        attempts.slice(-8).map(a => a.score + '/' + a.total + ' on ' + String(a.date).slice(0, 10)).join(', ') +
-        '. (Only overall scores are recorded, not which topics were missed.)');
-    } else {
-      L.push('\nQUICK QUIZ — no attempts yet.');
-    }
-
-    // Upload coverage
-    const counts = {}; UPLOAD_CATS.forEach(c => counts[c] = 0);
-    (store.papers || []).forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
-    L.push('\nUPLOAD COVERAGE — ' + UPLOAD_CATS.map(c => c + ': ' + counts[c]).join('; ') +
-      (UPLOAD_CATS.some(c => !counts[c]) ? '. Nothing uploaded under: ' + UPLOAD_CATS.filter(c => !counts[c]).join(', ') + '.' : '.'));
-
-    // Saved AI notes
-    const notes = (store.aiNotes || []).slice(-6);
-    if(notes.length){
-      L.push('\nSAVED AI NOTES (' + (store.aiNotes || []).length + ' total; latest):\n' +
-        notes.map(n => '- Q: ' + String(n.q).slice(0, 140) + ' — A: ' + String(n.a).replace(/\s+/g, ' ').slice(0, 220) + '…').join('\n'));
-    }
-
-    // Workspace state
-    try{
-      const sel = document.getElementById('ws-paper');
-      const paper = sel && sel.value ? (store.papers || []).find(p => p.id === sel.value) : null;
-      const ws = [];
-      ws.push(paper ? 'paper selected: "' + paper.name + '" (' + paper.category + ')' : 'no paper selected');
-      ws.push(wsGrabbedImageBlob ? 'a question segment is grabbed' : 'no question segment grabbed');
-      ws.push('study timer: ' + wsFormatTime(Math.max(0, wsTimerRemaining)) + ' remaining of ' + Math.round(wsTimerTotal / 60) + ' min' + (wsTimerRunning ? ' (running)' : ' (paused)'));
-      L.push('\nWORKSPACE — ' + ws.join('; ') + '.');
-    }catch(e){}
-
-    // Earlier questions in this AI Lab session
-    if(lmAiHistory.length){
-      L.push('\nEARLIER IN THIS AI LAB SESSION (oldest→newest):\n' + lmAiHistory.slice(-4).map(h =>
-        'Q: ' + String(h.q).slice(0, 200) + '\nA: ' + String(h.a).replace(/\s+/g, ' ').slice(0, 500) + (String(h.a).length > 500 ? '…' : '')).join('\n\n'));
-    }
-    return L.join('\n');
-  }
-
-  // Keyword retrieval (IDF-weighted) over every readable file, plus the live snapshot above.
-  // Returns { text, sources }.
-  function lmBuildContext(question){
-    const papers = store.papers || [];
-    const snapshot = "LIVE SNAPSHOT OF THE STUDENT'S LM TRACKER (as of right now):\n" + lmGatherAppContext();
-
-    const library = papers.length
-      ? papers.slice(0, 80).map(p => '- [' + p.category + '] ' + p.name + ' (' + (p.text ? 'readable' : 'name only') + ')').join('\n')
-      : '(nothing uploaded yet)';
-
-    const chunks = [];
-    papers.filter(p => p.text).forEach(p => {
-      const nameToks = new Set(lmTokens(p.name));
-      lmChunk(p.text).forEach(c => {
-        const toks = lmTokens(c); const tf = {};
-        toks.forEach(t => tf[t] = (tf[t] || 0) + 1);
-        chunks.push({ p, c, tf, nameToks });
-      });
-    });
-    const df = {};
-    chunks.forEach(ch => Object.keys(ch.tf).forEach(t => df[t] = (df[t] || 0) + 1));
-    const qToks = Array.from(new Set(lmTokens(question)));
-    const N = chunks.length || 1;
-    chunks.forEach(ch => {
-      let score = 0;
-      qToks.forEach(t => {
-        if(ch.tf[t]) score += Math.min(ch.tf[t], 3) * Math.log(1 + N / (1 + (df[t] || 0)));
-        if(ch.nameToks.has(t)) score += 1.5;
-      });
-      ch.score = score;
-    });
-    const picked = []; const perFile = {};
-    chunks.filter(ch => ch.score > 0).sort((a, b) => b.score - a.score).forEach(ch => {
-      if(picked.length >= 6 || (perFile[ch.p.id] || 0) >= 3) return;
-      perFile[ch.p.id] = (perFile[ch.p.id] || 0) + 1;
-      picked.push(ch);
-    });
-
-    let text = snapshot +
-      "\n\nTHE STUDENT'S LM LIBRARY — everything they have uploaded. Files marked 'name only' have no readable text (videos, images, scanned pages), so all you know about them is the title:\n" + library;
-    if(picked.length){
-      text += '\n\nRELEVANT EXCERPTS FROM THEIR FILES:\n' + picked.map(ch =>
-        '--- from "' + ch.p.name + '" (' + ch.p.category + ') ---\n' + ch.c).join('\n\n');
-    }
-    return { text, sources: Array.from(new Set(picked.map(ch => ch.p.name))) };
   }
 
   // ============ UPLOAD ============
@@ -1519,20 +1704,30 @@
     document.querySelectorAll('.cat-btn').forEach(b => b.addEventListener('click', () => { activeCat = b.dataset.cat; renderUpload(); }));
     renderFileList();
   }
+  function indexStatus(p){
+    if(!/\.pdf$/i.test(p.name || '')) return 'not indexed (not a PDF)';
+    if(p.indexed){
+      let t = 'indexed, ' + (p.chunkCount || 0) + ' chunks';
+      if(p.totalPages && p.pagesIndexed && p.pagesIndexed < p.totalPages) t += ' (first ' + p.pagesIndexed + ' of ' + p.totalPages + ' pages only)';
+      return t;
+    }
+    if(p.indexError) return 'NOT indexed: ' + p.indexError;
+    return 'not indexed';
+  }
   function renderFileList(){
     const wrap = document.getElementById('file-list');
     wrap.innerHTML = store.papers.length ? store.papers.slice().reverse().map(p => `
       <div class="file-row">
         <span class="file-tag">${escapeHtml(p.category)}</span>
         <span class="file-name">${p.file_url ? `<a href="${escapeHtml(p.file_url)}" target="_blank" rel="noopener" style="color:inherit;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</span>
-        <span class="file-date" title="Whether the AI can read this file's contents">${p.text ? 'AI: READ' : (lmCanRead(p.name) ? (p.indexedAt ? 'AI: NO TEXT' : 'AI: READING\u2026') : 'AI: NAME ONLY')}</span>
-        <span class="file-date">${fmtDate(p.addedAt)}</span>
+        <span class="file-date">${fmtDate(p.addedAt)} · ${escapeHtml(indexStatus(p))}</span>
         <span class="file-remove" data-remove="${p.id}">remove</span>
       </div>`).join('') : '<div class="empty-note">nothing uploaded yet</div>';
     wrap.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', async () => {
       const paper = store.papers.find(p => String(p.id) === el.dataset.remove);
       try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(el.dataset.remove).delete(); }
       catch(e){ alert('Could not remove: ' + e.message); return; }
+      try{ await deleteChunksForPaper(el.dataset.remove); }catch(e){}
       if(paper && paper.file_path && supabaseClient){
         try{ await supabaseClient.storage.from(SUPABASE_BUCKET).remove([paper.file_path]); }catch(e){}
       }
@@ -1545,6 +1740,7 @@
     if(!supabaseClient){ alert('File storage isn\u2019t available \u2014 check the Supabase config.'); return; }
     const label = document.getElementById('dropzone-label');
     const originalLabel = label.textContent;
+    const problems = [];
     for(const f of files){
       label.textContent = 'uploading ' + f.name + '\u2026';
       try{
@@ -1552,22 +1748,28 @@
         const { error: upErr } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, f, { upsert:false });
         if(upErr) throw upErr;
         const { data: urlData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
-        const extra = {};
-        if(lmCanRead(f.name)){
-          label.textContent = 'reading ' + f.name + '\u2026';
-          try{ extra.text = await lmExtractText(f, f.name); extra.indexedAt = new Date().toISOString(); }
-          catch(e){ console.warn('could not read', f.name, e); }
-        }
-        await db.collection(TRACKER_COLLECTIONS.papers).add({
+        const docRef = await db.collection(TRACKER_COLLECTIONS.papers).add({
           uid: currentUid, name: f.name, category: activeCat,
           addedAt: new Date().toISOString(), file_url: urlData.publicUrl, file_path: path,
-          ...extra
+          indexed: false
         });
+        if(/\.pdf$/i.test(f.name || '')){
+          try{
+            label.textContent = 'indexing ' + f.name + '\u2026';
+            await indexPaperFile({ id: docRef.id, category: activeCat, name: f.name }, f);
+          }catch(indexErr){
+            console.error('indexing failed', indexErr);
+            problems.push(f.name + ': uploaded, but NOT indexed (' + (indexErr.message || indexErr) + ')');
+            try{ await db.collection(TRACKER_COLLECTIONS.papers).doc(docRef.id).update({ indexed: false, indexError: String(indexErr.message || indexErr) }); }catch(e){}
+          }
+        }
+        else { problems.push(f.name + ': uploaded, but not searchable (only PDFs are indexed)'); }
       }catch(e){
         alert('Could not upload "' + f.name + '": ' + (e.message || e));
       }
     }
     label.textContent = originalLabel;
+    if(problems.length) alert('Upload finished with notes:\n\n' + problems.join('\n'));
   }
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('file-input');
@@ -1607,24 +1809,26 @@
       <div class="quiz-q">${escapeHtml(item.q)}</div>
       ${item.opts.map((o,i) => `<button class="quiz-opt" data-i="${i}">${escapeHtml(o)}</button>`).join('')}
       <div class="quiz-foot"><span class="stat-label" id="quiz-feedback"></span></div>`;
-    card.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', () => {
+    card.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', async () => {
       const i = Number(btn.dataset.i);
       card.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
-      if(i === item.correct){ btn.classList.add('correct'); quizScore++; document.getElementById('quiz-feedback').textContent = 'correct'; }
+      const correct = (i === item.correct);
+      if(correct){ btn.classList.add('correct'); quizScore++; document.getElementById('quiz-feedback').textContent = 'correct'; }
       else{
         btn.classList.add('wrong');
         card.querySelector(`[data-i="${item.correct}"]`).classList.add('correct');
         document.getElementById('quiz-feedback').textContent = 'not quite';
       }
+      try{ await bumpMastery(guessTopic(item.q), correct); }catch(e){ console.error('mastery update failed', e); }
       setTimeout(() => { quizIdx++; renderQuizQuestion(); }, 900);
     }));
   }
 
   // ============ SIMILAR QUESTIONS — real embedding model ============
   // Client-side sentence embeddings via transformers.js (MiniLM), no server needed —
-  // same pattern as the SNISS embedding workspace. The SIM_BANK corpus below stands
-  // in for real uploaded past papers until that pipeline exists; everything past
-  // computing the embeddings themselves already works with real data, not fake data.
+  // same pattern as the SNISS embedding workspace. The SIM_BANK corpus below is
+  // a built-in SAMPLE set used only when fewer than 3 real chunks are indexed.
+  // Results from it are always labelled SAMPLE in the UI.
   const SIM_BANK = [
     { src:'2020 Past Paper, Q4', text:'Find the derivative of f(x) = x³ - 2x² + 5x using first principles.' },
     { src:'2021 Past Paper, Q2', text:'Use implicit differentiation to find dy/dx for x² + y² = 25.' },
@@ -1677,15 +1881,14 @@
     goBtn.disabled = true;
     wrap.innerHTML = `<div class="empty-note">${firstLoad ? 'loading the embedding model (first search only, ~10–30s)…' : 'searching…'}</div>`;
     try{
-      await ensureSimBankEmbedded();
-      const qEmbedding = await embedText(q);
-      const ranked = SIM_BANK
-        .map(s => ({ src: s.src, text: s.text, score: dotProduct(qEmbedding, s.embedding) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
-      wrap.innerHTML = ranked.map(r => `
+      const ranked = await searchCorpus(q, 3);
+      const anyDemo = ranked.some(r => r.demo);
+      const banner = anyDemo
+        ? '<div class="empty-note" style="color:var(--amber);font-style:normal;">SAMPLE DATA: fewer than 3 chunks of your PDFs are indexed, so these come from a built-in sample set, not your papers.</div>'
+        : '';
+      wrap.innerHTML = banner + ranked.map(r => `
         <div class="sim-result">
-          <div class="sim-top"><span>${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% match</span></div>
+          <div class="sim-top"><span>${r.demo ? 'SAMPLE · ' : 'YOUR UPLOAD · '}${escapeHtml(r.src)}</span><span>${Math.round(r.score * 100)}% similarity</span></div>
           <div class="sim-text">${escapeHtml(r.text)}</div>
         </div>`).join('');
     }catch(e){
@@ -1716,8 +1919,8 @@
 
   // ============ WORKSPACE ============
   // Timer, paper selector, and the paper/board split attempt area.
-  // "View Answer" / "View AI's Take" are placeholders until an answer-key
-  // pipeline and the AI Lab backend exist.
+  // "View Answer" shows an uploaded memo matched by filename. "View AI's Take"
+  // sends the images to the AI backend; its output is AI-generated and unverified.
   let wsTimerRemaining = 25 * 60;
   let wsTimerTotal = 25 * 60;
   let wsTimerInterval = null;
@@ -1909,7 +2112,7 @@
 
   function wsResetQuestionDisplay(){
     document.getElementById('ws-question-display').innerHTML = '<div class="ws-empty">upload a paper on the Upload tab, then pick it above to grab a segment to work on</div>';
-    wsGrabbedImageBlob = null;
+    wsGrabbedImageBlob = null; wsGrabbedImageDataUrl = null;
   }
 
   function wsPopulatePaperSelect(){
@@ -1936,7 +2139,7 @@
   async function wsOpenGrabTool(paper){
     const displayEl = document.getElementById('ws-question-display');
     const isPdf = /\.pdf(\?|$)/i.test(paper.file_url || '') || /\.pdf$/i.test(paper.name || '');
-    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1; wsGrabbedImageBlob = null;
+    wsGrabPdf = null; wsGrabPageNum = 1; wsGrabSel = null; wsGrabZoom = 1; wsGrabbedImageBlob = null; wsGrabbedImageDataUrl = null;
 
     displayEl.innerHTML = `
       <div class="ws-grab">
@@ -2091,6 +2294,7 @@
   }
 
   let wsGrabbedImageBlob = null; // the grabbed question segment, sent to the AI alongside the whiteboard
+  let wsGrabbedImageDataUrl = null; // dataURL version, sent to the LM AI API
 
   function wsUseGrabSelection(){
     const canvas = document.getElementById('ws-grab-canvas');
@@ -2103,6 +2307,7 @@
     crop.height = Math.round(wsGrabSel.h);
     crop.getContext('2d').drawImage(canvas, wsGrabSel.x, wsGrabSel.y, wsGrabSel.w, wsGrabSel.h, 0, 0, crop.width, crop.height);
     const dataUrl = crop.toDataURL('image/png');
+    wsGrabbedImageDataUrl = dataUrl;
     crop.toBlob(blob => { wsGrabbedImageBlob = blob; }, 'image/png');
     document.getElementById('ws-question-display').innerHTML = `
       <div class="ws-paper-shot">
@@ -2129,64 +2334,210 @@
     if(!paper){ wsResetQuestionDisplay(); return; }
     wsOpenGrabTool(paper);
   });
-  document.getElementById('ws-view-answer').addEventListener('click', async () => {
+  document.getElementById('ws-view-answer').addEventListener('click', () => {
     const revealArea = document.getElementById('ws-reveal-area');
-    const btn = document.getElementById('ws-view-answer');
-    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER</div><span id="ws-answer-text">Thinking\u2026</span></div>`;
-    const textEl = document.getElementById('ws-answer-text');
-
-    if(!wsGrabbedImageBlob){
-      textEl.textContent = "Grab a segment of the question first, so there's something to solve.";
+    const memos = (store.papers || []).filter(p => p.category === 'Memos / Answers');
+    if(!memos.length){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — LOCKED</div>No memo uploaded yet. Upload an answer memo on the Upload tab under the "Memos / Answers" category, then try again.</div>`;
       return;
     }
-    btn.disabled = true;
-    try{
-      const prompt = "You're solving a question for a first-year Applied Mathematics student. The image is the question, grabbed from their paper.\n\nWork through it fully and rigorously yourself, exactly as a careful mathematician marking their own work would: write out every algebraic/calculus step explicitly, don't skip manipulations, and re-check each step before moving to the next (a wrong sign, a dropped term, or a misapplied rule anywhere invalidates everything after it). If more than one sub-part is asked, answer all of them. Use proper mathematical notation (e.g. write x^2, sqrt(x), integrals and derivatives out in words/symbols clearly since this is plain text). Finish with the final answer stated plainly on its own line.\n\nAccuracy matters far more than brevity here — take the space you need.";
-      const result = await lmAi(prompt, {
-        images: [wsGrabbedImageBlob],
-        codeExecution: true,
-        thinking: 'high'
-      });
-      textEl.innerHTML = escapeHtml(result.text).replace(/\n/g, '<br>');
-    }catch(e){
-      textEl.textContent = wsAiErrorCopy(e);
-    }finally{
-      btn.disabled = false;
+    const paperId = document.getElementById('ws-paper').value;
+    const paper = (store.papers || []).find(p => p.id === paperId);
+    const norm = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    let memo = null;
+    if(paper){
+      const pn = norm(paper.name);
+      memo = memos.find(m => { const mn = norm(m.name); return mn && pn && (pn.indexOf(mn) !== -1 || mn.indexOf(pn) !== -1); });
     }
+    if(!memo && memos.length === 1) memo = memos[0];
+    if(!memo){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — LOCKED</div>You have ${memos.length} memos uploaded, but none matches the selected paper by filename. Name the memo after the paper (e.g. "${escapeHtml(paper ? String(paper.name).replace(/\.[^.]+$/, '') + ' — memo.pdf' : 'paper — memo.pdf')}") or upload the right one.</div>`;
+      return;
+    }
+    const isPdf = /\.pdf(\?|$)/i.test(memo.file_url || '') || /\.pdf$/i.test(memo.name || '');
+    const isImg = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(memo.file_url || memo.name || '');
+    const viewer = isPdf
+      ? `<embed src="${escapeHtml(memo.file_url)}" type="application/pdf" style="width:100%;height:480px;border:1px solid var(--line);background:#f4f1ea;">`
+      : isImg
+        ? `<img src="${escapeHtml(memo.file_url)}" style="max-width:100%;display:block;margin-top:8px;background:#f4f1ea;">`
+        : `<a href="${escapeHtml(memo.file_url)}" target="_blank" rel="noopener" style="color:var(--amber-bright);">open memo ↗</a>`;
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">ANSWER — ${escapeHtml(memo.name)}</div>${viewer}</div>`;
   });
+  // "AI's Take" answers the QUESTION on the paper. It never looks at the
+  // student's whiteboard working and never grades the student.
   document.getElementById('ws-view-ai').addEventListener('click', async () => {
     const revealArea = document.getElementById('ws-reveal-area');
     const btn = document.getElementById('ws-view-ai');
-    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div><span id="ws-ai-take-text">Thinking\u2026</span></div>`;
-    const textEl = document.getElementById('ws-ai-take-text');
-
+    if(!wsGrabbedImageDataUrl){
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Grab a question from the paper first (crop it on the left). This does not look at your whiteboard working.</div>`;
+      return;
+    }
+    const images = [wsGrabbedImageDataUrl];
+    revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 1 OF 2 · READING THE QUESTION</div>Reading…</div>`;
     btn.disabled = true;
     try{
-      const images = [];
-      if(wsGrabbedImageBlob) images.push(wsGrabbedImageBlob);
-      const boardBlob = await new Promise(resolve => wsCanvas.toBlob(resolve, 'image/png'));
-      if(boardBlob) images.push(boardBlob);
-      if(!images.length){
-        textEl.textContent = "Grab a segment or write something on the board first, so there's something for the AI to look at.";
-        btn.disabled = false;
-        return;
-      }
-      const prompt = wsGrabbedImageBlob
-        ? "You're marking a first-year Applied Mathematics student's work. The FIRST image is the question, grabbed from their paper. The SECOND image is their handwritten attempt on a whiteboard.\n\nFirst, work through the question fully and correctly yourself — every step, re-checked, exactly as a careful mathematician would. Only once you have the correct working should you compare it against the student's attempt.\n\nThen go through their attempt step by step: for each step, say plainly whether it's correct. The moment you find the first error, name exactly what it is (e.g. 'sign error when moving the 3x to the other side', 'the power rule was applied to the wrong term') rather than being vague about it — precision here matters more than being gentle. Don't restate every subsequent step once you've flagged where it went wrong. If the attempt is fully correct, say so plainly and confirm the final answer matches. Don't hand them the final answer outright if they haven't reached it themselves — point at the error and let them fix it — but be exact, not hand-wavy, about what that error is."
-        : "You're marking a first-year Applied Mathematics student's work. This image is their handwritten attempt on a whiteboard — no question image is attached, so first work out what question they're likely answering from the working itself, then work through it fully and correctly yourself.\n\nThen go through their attempt step by step: say plainly whether each step is correct, and the moment you find the first error, name exactly what it is rather than being vague. If it's fully correct, say so plainly.";
-      const result = await lmAi(prompt, {
-        images,
-        codeExecution: true,
-        thinking: 'high'
+      const tPrompt = "The image is a question cropped from a student's maths paper. Transcribe ONLY the question text, faithfully, as plain text using math.js-style notation where helpful. Do NOT answer or solve it here. Write [unclear] wherever you can't read something. Return ONLY JSON: {\"question\":\"...\",\"unclear\":[\"short notes on anything hard to read\"]}.";
+      const raw = await runAi({ prompt: tPrompt, images, json: true, thinking: 'low' });
+      const t = parseJsonLoose(raw);
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 1 OF 2 · CHECK WHAT THE AI READ</div>
+        The AI can misread a cropped image (a 2 as a z, a minus as a plus). Fix anything wrong before it answers.
+        ${(t.unclear && t.unclear.length) ? '<br><span style="color:var(--amber);">Unclear to the AI: ' + escapeHtml(t.unclear.join('; ')) + '</span>' : ''}
+        <div class="stat-label" style="margin-top:12px;">QUESTION</div>
+        <textarea id="ws-tr-q" class="ws-edit" rows="4"></textarea>
+        <button class="go-btn" id="ws-tr-go">LOOKS RIGHT · SOLVE IT</button></div>`;
+      document.getElementById('ws-tr-q').value = t.question || '';
+      document.getElementById('ws-tr-go').addEventListener('click', async () => {
+        const question = document.getElementById('ws-tr-q').value.trim();
+        if(!question){ alert('There is no question to answer.'); return; }
+        revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE · STEP 2 OF 2 · SOLVING</div><span id="ws-ai-take-text">Looking for a matching memo, then solving…</span></div>`;
+        const textEl = document.getElementById('ws-ai-take-text');
+        try{
+          // find memo excerpts most similar to the question (used to check the
+          // AI's own answer, never to evaluate the student)
+          let memoHits = [];
+          try{
+            const paperId = document.getElementById('ws-paper').value;
+            const paper = (store.papers || []).find(pp => pp.id === paperId);
+            const norm = x => String(x || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]+/g, ' ').trim();
+            let pool = (store.chunks || []).filter(c => c.category === 'Memos / Answers' && Array.isArray(c.embedding) && c.embedding.length);
+            if(paper){
+              const pn = norm(paper.name);
+              const same = pool.filter(c => { const mn = norm(c.name); return mn && pn && (pn.indexOf(mn) !== -1 || mn.indexOf(pn) !== -1); });
+              if(same.length) pool = same;
+            }
+            if(pool.length){
+              const qe = await embedText(question);
+              memoHits = pool.map(c => Object.assign({}, c, { score: dotProduct(qe, c.embedding) }))
+                .filter(c => c.score >= MIN_RELEVANT_SCORE)
+                .sort((x, y) => y.score - x.score).slice(0, 3);
+            }
+          }catch(memoErr){ console.error('memo search failed', memoErr); }
+
+          const memoContext = memoHits.length
+            ? 'OFFICIAL MEMO EXCERPTS (matched to the question by text similarity, so they may belong to a different question):\n\n' + memoHits.map((h, i) => '[' + (i+1) + '] ' + (h.name || h.src) + '\n' + h.text.slice(0, 1200)).join('\n\n')
+            : '';
+          const sPrompt = "You're a maths tutor. Solve the question below for a first-year student, showing working step by step, a few sentences unless it genuinely needs more.\n\nQUESTION (transcribed from a cropped image, confirmed by the student):\n" + question + "\n\n"
+            + (memoHits.length
+              ? "Official memo excerpts are provided. If they clearly correspond to this exact question, use them to check your final answer and say so. If they don't match, say so and ignore them.\n"
+              : "No memo is available for this question. Say plainly that your answer is unverified against an official memo.\n")
+            + "Use code to verify any calculations. End with a clear 'FINAL ANSWER:' line.";
+          let text = await runAi({ prompt: sPrompt, context: memoContext, codeExecution: true });
+          text += memoHits.length
+            ? '\n\n— Checked against ' + memoHits.length + ' memo excerpt(s) from: ' + Array.from(new Set(memoHits.map(h => h.name || h.src))).join(', ') + '. Excerpts are matched by similarity, so check they belong to this question. This is an AI-generated solution and can still be wrong.'
+            : '\n\n— No matching memo excerpt was found (upload the memo as a text PDF under Memos / Answers). This is the AI\'s own unverified solution. Check it against the memo.';
+
+          const chk = document.createElement('div');
+          chk.className = 'ai-check';
+          chk.textContent = 'AUTO-CHECK: re-checking the final result…';
+          textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+          textEl.parentElement.appendChild(chk);
+          const res = await autoCheckAnswer(question, text);
+          chk.className = 'ai-check ' + (res.status === 'ok' ? 'ok' : res.status === 'fail' ? 'bad' : '');
+          chk.textContent = 'AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
+        }catch(e){
+          textEl.textContent = aiErrorText(e);
+        }
       });
-      textEl.innerHTML = escapeHtml(result.text).replace(/\n/g, '<br>');
     }catch(e){
-      textEl.textContent = wsAiErrorCopy(e);
+      revealArea.innerHTML = `<div class="ws-reveal"><div class="wr-tag">AI'S TAKE</div>Couldn't read the question: ${escapeHtml(aiErrorText(e))}</div>`;
     }finally{
       btn.disabled = false;
     }
   });
   function renderWorkspace(){ wsUpdateTimerDisplay(); wsPopulatePaperSelect(); requestAnimationFrame(wsApplyZoom); }
+
+  // ---- Live snapshot of every tab (same idea as Vault's aiLabGatherContext) ----
+  function lmDaysUntil(dateStr){
+    const d = new Date(dateStr + 'T00:00:00'); const t = new Date(); t.setHours(0,0,0,0);
+    return Math.round((d - t) / 86400000);
+  }
+  function lmGatherAppContext(){
+    const L = [];
+    const now = new Date();
+    L.push('Today: ' + now.toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' }));
+
+    if(lmProfile){
+      const bits = [];
+      if(lmProfile.name) bits.push('name: ' + lmProfile.name);
+      if(lmProfile.degree) bits.push('degree: ' + lmProfile.degree);
+      if(lmProfile.institution) bits.push('institution: ' + lmProfile.institution);
+      if(lmProfile.module) bits.push('module: ' + lmProfile.module);
+      if(bits.length) L.push('Student — ' + bits.join(', '));
+    }
+
+    // Calendar
+    const events = (store.events || []).filter(e => e && e.date).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const upcoming = events.filter(e => lmDaysUntil(e.date) >= 0).slice(0, 12);
+    const past = events.filter(e => lmDaysUntil(e.date) < 0).slice(-5);
+    L.push('\nCALENDAR — upcoming assessments:' + (upcoming.length
+      ? '\n' + upcoming.map(e => {
+          const n = lmDaysUntil(e.date);
+          return '- ' + e.date + ' (' + (n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days') + '): ' + e.name;
+        }).join('\n')
+      : ' none logged'));
+    if(past.length) L.push('Recent past dates:\n' + past.map(e => '- ' + e.date + ': ' + e.name).join('\n'));
+
+    // Quick Quiz + spaced-repetition mastery (per topic)
+    const attempts = (store.quizAttempts || []).filter(a => a && a.total).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if(attempts.length){
+      const avg = Math.round(attempts.reduce((t, a) => t + a.score / a.total, 0) / attempts.length * 100);
+      L.push('\nQUICK QUIZ (a fixed hand-written sample bank, not generated from uploads) — ' + attempts.length + ' attempt(s), average ' + avg + '%. Recent (oldest→newest): ' +
+        attempts.slice(-8).map(a => a.score + '/' + a.total + ' on ' + String(a.date).slice(0, 10)).join(', ') + '.');
+    } else {
+      L.push('\nQUICK QUIZ — no attempts yet.');
+    }
+    const nowIso = now.toISOString();
+    const mastery = (store.mastery || []).filter(m => m && m.topic);
+    if(mastery.length){
+      const sorted = mastery.slice().sort((a, b) => (a.accuracy || 0) - (b.accuracy || 0));
+      const dueNow = mastery.filter(m => (m.dueAt || '') <= nowIso).map(m => m.topic);
+      L.push('TOPIC MASTERY (from quiz answers; weakest first): ' + sorted.slice(0, 8).map(m =>
+        m.topic + ' ' + (m.accuracy || 0) + '% (' + (m.correct || 0) + ' right, ' + (m.wrong || 0) + ' wrong)').join('; ') +
+        '. Due for review now: ' + (dueNow.length ? dueNow.join(', ') : 'nothing') + '.');
+    }
+
+    // Uploads: coverage, index status, topics found
+    const counts = {}; UPLOAD_CATS.forEach(c => counts[c] = 0);
+    (store.papers || []).forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+    L.push('\nUPLOAD COVERAGE — ' + UPLOAD_CATS.map(c => c + ': ' + counts[c]).join('; ') +
+      (UPLOAD_CATS.some(c => !counts[c]) ? '. Nothing uploaded under: ' + UPLOAD_CATS.filter(c => !counts[c]).join(', ') + '.' : '.'));
+    const papers = (store.papers || []).slice(0, 60);
+    L.push('FILES (' + (store.papers || []).length + '):' + (papers.length
+      ? '\n' + papers.map(p => '- [' + p.category + '] ' + p.name + ' (' + indexStatus(p) + ')').join('\n')
+      : ' none'));
+    const topicCounts = {};
+    (store.chunks || []).forEach(c => { if(c.topic && c.topic !== 'General') topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1; });
+    const topicList = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).map(([t, n]) => t + ' (' + n + ' passages)');
+    if(topicList.length) L.push('Topics detected in their uploaded material: ' + topicList.join(', ') + '.');
+
+    // Saved AI notes
+    const notes = (store.aiNotes || []).slice(-6);
+    if(notes.length){
+      L.push('\nSAVED AI NOTES (' + (store.aiNotes || []).length + ' total; latest):\n' +
+        notes.map(n => '- Q: ' + String(n.q).slice(0, 140) + ' — A: ' + String(n.a).replace(/\s+/g, ' ').slice(0, 220) + '…').join('\n'));
+    }
+
+    // Workspace state
+    try{
+      const sel = document.getElementById('ws-paper');
+      const paper = sel && sel.value ? (store.papers || []).find(p => p.id === sel.value) : null;
+      const ws = [];
+      ws.push(paper ? 'paper selected: "' + paper.name + '" (' + paper.category + ')' : 'no paper selected');
+      ws.push(wsGrabbedImageDataUrl ? 'a question is grabbed' : 'no question grabbed');
+      ws.push('study timer: ' + wsFormatTime(Math.max(0, wsTimerRemaining)) + ' remaining of ' + Math.round(wsTimerTotal / 60) + ' min' + (wsTimerRunning ? ' (running)' : ' (paused)'));
+      L.push('\nWORKSPACE — ' + ws.join('; ') + '.');
+    }catch(e){}
+
+    // Live tab (a break feed unrelated to the maths): just the followed interests
+    try{ L.push('\nLIVE TAB (a break feed, unrelated to their maths) — interests they follow: ' + liveGetInterests().join(', ') + '.'); }catch(e){}
+
+    // Earlier questions in this AI Lab session
+    if(lmAiHistory.length){
+      L.push('\nEARLIER IN THIS AI LAB SESSION (oldest→newest):\n' + lmAiHistory.slice(-4).map(h =>
+        'Q: ' + String(h.q).slice(0, 200) + '\nA: ' + String(h.a).replace(/\s+/g, ' ').slice(0, 500) + (String(h.a).length > 500 ? '…' : '')).join('\n\n'));
+    }
+    return "LIVE SNAPSHOT OF THE STUDENT'S LM TRACKER (as of right now):\n" + L.join('\n');
+  }
 
   // ============ AI LAB / AI NOTES ============
   function renderAiLab(){ document.getElementById('ai-results').innerHTML = ''; }
@@ -2197,33 +2548,36 @@
     const goBtn = document.getElementById('ai-go');
     const div = document.createElement('div');
     div.className = 'ai-result';
-    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">Thinking\u2026</div>`;
+    div.innerHTML = `<div class="ai-tag">RE: ${escapeHtml(q)}</div><div class="ai-text">Thinking…</div>`;
     wrap.prepend(div);
     document.getElementById('ai-input').value = '';
     const textEl = div.querySelector('.ai-text');
 
     goBtn.disabled = true;
     let answer = '';
-    const ctx = lmBuildContext(q);
     try{
-      const prompt = `You're the AI Lab assistant inside LM, a mathematics study platform for a first-year Applied Mathematics student at university level. If the question involves any calculation, proof, or derivation, work through it fully and rigorously yourself first — every algebraic/calculus step written out explicitly and re-checked before you move on, exactly as a careful mathematician marking their own work would. Show the complete working, not just the result, and state the final answer plainly at the end. If the question is conceptual rather than computational, explain it clearly and precisely instead. Accuracy matters far more than brevity — take the space a correct, complete answer needs.\n\nA live snapshot of the student's LM tracker is provided above (profile, today's date, calendar, quiz results, uploads, saved notes, workspace state, earlier questions this session), along with excerpts from their files most relevant to this question. Use it whenever the question is about their progress, deadlines, material or earlier questions, and name the file you drew on. Never invent tracker data that isn't in the snapshot — if it isn't there, say so plainly. For pure maths questions the snapshot can be ignored.\n\nQuestion: ${q}`;
-      const result = await lmAi(prompt, {
-        context: ctx.text,
-        codeExecution: true,
-        thinking: 'high'
-      });
-      answer = result.text;
-      lmAiHistory.push({ q, a: answer }); if(lmAiHistory.length > 8) lmAiHistory.shift();
-      textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
-      if(ctx.sources.length){
-        const src = document.createElement('div');
-        src.className = 'ai-sources';
-        src.style.cssText = 'margin-top:12px;font-size:10px;letter-spacing:1px;color:var(--dim);';
-        src.textContent = 'DREW ON: ' + ctx.sources.join('  \u00b7  ');
-        div.appendChild(src);
+      let hits = [];
+      let searchFailed = false;
+      try{
+        hits = (await searchCorpus(q, 4)).filter(h => !h.demo && h.score >= MIN_RELEVANT_SCORE);
+      }catch(searchErr){
+        console.error('excerpt search failed', searchErr);
+        searchFailed = true;
       }
+      const excerpts = hits.map((h, i) => '[' + (i+1) + '] ' + h.src + '\n' + h.text.slice(0, 1200)).join('\n\n');
+      const context = lmGatherAppContext() + (excerpts ? "\n\nEXCERPTS FROM THE STUDENT'S UPLOADED MATERIAL (most relevant to this question):\n\n" + excerpts : '');
+      const prompt = "You're the AI Lab assistant inside LM Mathematics, a personal study system for a first-year mathematics student. Answer the student's question clearly and concisely — a few sentences unless it genuinely needs more, with any working shown step by step. Ground your answer in the provided excerpts from the student's own uploaded material when they're relevant, and say plainly when the material doesn't cover something. If no excerpts are provided, answer from general knowledge and do not claim to be using the student's material. A live snapshot of the student's tracker is also provided (today's date, calendar, quiz results, topic mastery, uploads, saved notes, workspace state, and earlier questions this session): use it whenever the question is about their progress, deadlines, weak topics, uploads or earlier questions, and never invent tracker data that isn't in the snapshot. For pure maths questions the snapshot can be ignored. If you are unsure of a result, say so rather than guessing.\n\nQuestion: " + q;
+      answer = await runAi({ prompt, context, codeExecution: true });
+      lmAiHistory.push({ q, a: answer }); if(lmAiHistory.length > 8) lmAiHistory.shift();
+      if(hits.length){
+        const names = Array.from(new Set(hits.map(h => h.name || h.src))).join(', ');
+        answer += '\n\n— The AI was given ' + hits.length + ' excerpt(s) from your uploads (' + names + '). That does not guarantee the answer is correct. Verify against your memos.';
+      } else {
+        answer += '\n\n— No relevant excerpts from your uploads were sent' + (searchFailed ? ' (the excerpt search failed)' : '') + ', so this answer comes from the AI\'s general knowledge and may be wrong. Verify it.';
+      }
+      textEl.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>');
     }catch(e){
-      textEl.textContent = wsAiErrorCopy(e);
+      textEl.textContent = aiErrorText(e);
       goBtn.disabled = false;
       return;
     }
@@ -2236,11 +2590,21 @@
     saveBtn.addEventListener('click', async function(){
       if(!fbReady || !currentUid) return;
       try{
-        await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString() });
+        await db.collection(TRACKER_COLLECTIONS.aiNotes).add({ uid: currentUid, q, a: answer, date: new Date().toISOString(), source: 'ai_lab' });
         this.textContent = 'SAVED';
         this.classList.add('saved');
       }catch(e){ alert('Could not save note: ' + e.message); }
     });
+
+    // Independent re-check of the final result, done in your browser.
+    const chk = document.createElement('div');
+    chk.className = 'ai-check';
+    chk.textContent = 'AUTO-CHECK: re-checking the final result…';
+    div.insertBefore(chk, saveBtn);
+    const res = await autoCheckAnswer(q, answer);
+    chk.className = 'ai-check ' + (res.status === 'ok' ? 'ok' : res.status === 'fail' ? 'bad' : '');
+    chk.textContent = 'AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
+    answer += '\n\n— AUTO-CHECK: ' + (res.status === 'unchecked' ? 'NOT CHECKED, ' : '') + res.msg;
   });
   document.getElementById('ai-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('ai-go').click(); });
 
@@ -2322,23 +2686,338 @@
   });
 
   // ============ EXPLORE ============
+  // Static, hand-checked concept cards — not AI-generated, so a wrong
+  // diagram or fact never slips in. Each is tagged with a topic from the
+  // same list guessTopic() uses, so this screen can line up with what a
+  // student has actually uploaded.
   const EXPLORE_FACTS = [
-    { fact:'The equals sign (=) was invented in 1557 by Robert Recorde, who said he chose two parallel lines "because no two things can be more equal."', src:"History of mathematical notation" },
-    { fact:'There are infinitely many prime numbers — Euclid proved this over 2000 years ago with a strikingly short proof.', src:"Euclid's Elements, Book IX" },
-    { fact:'The Fibonacci sequence appears in sunflower seed spirals, pinecones, and nautilus shells.', src:'Phyllotaxis research' },
-    { fact:'Calculus was developed independently by both Newton and Leibniz in the late 1600s — the dy/dx notation comes from Leibniz.', src:'History of calculus' },
-    { fact:'"Googol" (10¹⁰⁰) was coined by a 9-year-old in 1920, asked by his mathematician uncle to name a very large number.', src:'Mathematics and the Imagination, Kasner & Newman' },
-    { fact:'"Proof by contradiction" was used to show √2 is irrational — one of the oldest proof techniques still taught today.', src:'Classical Greek mathematics' }
+    { topic:'Differentiation', fact:'The derivative at a point is the slope of the tangent line there — the limit of the slope of secant lines as they get infinitely close.', src:'Definition of the derivative' },
+    { topic:'Differentiation', fact:"Newton called derivatives \u201cfluxions\u201d — rates of flow — decades before the word \u201cderivative\u201d caught on.", src:'History of calculus' },
+    { topic:'Integration', fact:'A definite integral is the signed area between a curve and the x-axis — area below the axis counts as negative.', src:'Definition of the definite integral' },
+    { topic:'Integration', fact:'The integral sign \u222b is an elongated \u201cS\u201d, chosen by Leibniz for \u201csumma\u201d (sum), since integration began as summing infinitely many thin strips.', src:'History of mathematical notation' },
+    { topic:'Related Rates', fact:'Related rates problems link two changing quantities through an equation, then differentiate both sides with respect to time to connect their rates.', src:'Related rates, standard calculus texts' },
+    { topic:'Related Rates', fact:'The classic \u201cladder sliding down a wall\u201d problem has appeared in introductory calculus texts largely unchanged since the early 1900s.', src:'History of calculus textbooks' },
+    { topic:'Proofs', fact:'Proof by induction works like dominoes: show the first case falls, then show each case knocks over the next, and the whole infinite line falls.', src:'Principle of mathematical induction' },
+    { topic:'Proofs', fact:'Proof by contradiction assumes the opposite of what you want to prove, then shows that leads to nonsense — used to show \u221a2 is irrational.', src:'Classical Greek mathematics' },
+    { topic:'Series', fact:'A series converges when its partial sums settle toward a fixed limit as more terms are added — otherwise it diverges.', src:'Definition of series convergence' },
+    { topic:'Series', fact:'The harmonic series (1 + 1/2 + 1/3 + \u2026) grows without bound even though its terms shrink to zero — a classic \u201clooks convergent, isn\u2019t\u201d case.', src:'Divergence of the harmonic series' },
+    { topic:'Linear Algebra', fact:'A matrix can be seen as a transformation: it stretches, rotates, or skews space, turning a square grid into a parallelogram grid.', src:'Linear transformations' },
+    { topic:'Linear Algebra', fact:'Eigenvectors are the special directions a transformation doesn\u2019t rotate — it only stretches or shrinks them, by a factor called the eigenvalue.', src:'Eigenvalues and eigenvectors' },
+    { topic:'Probability', fact:'The normal (\u201cbell curve\u201d) distribution shows up wherever a quantity is the sum of many small independent effects — the Central Limit Theorem.', src:'Central Limit Theorem' },
+    { topic:'Probability', fact:'Expected value is a weighted average of outcomes — what you\u2019d expect on average over many repeats, not what typically happens in any one trial.', src:'Definition of expected value' },
+    { topic:'General', fact:'The equals sign (=) was introduced in 1557 by Robert Recorde, who explained (in old English) that he chose two parallel lines because no two things could be more equal.', src:'History of mathematical notation' },
+    { topic:'General', fact:'There are infinitely many prime numbers — Euclid proved this over 2000 years ago with a strikingly short proof.', src:"Euclid's Elements, Book IX" }
   ];
-  let exploreIdx = -1;
-  function renderExplore(){
-    let i;
-    do{ i = Math.floor(Math.random()*EXPLORE_FACTS.length); } while(i === exploreIdx && EXPLORE_FACTS.length > 1);
-    exploreIdx = i;
-    document.getElementById('explore-fact').textContent = EXPLORE_FACTS[i].fact;
-    document.getElementById('explore-src').textContent = '— ' + EXPLORE_FACTS[i].src;
+
+  // One small inline SVG per topic. Uses currentColor / theme CSS vars so it
+  // reskins automatically with the rest of the app.
+  const EXPLORE_VIZ = {
+    'Differentiation': `<svg viewBox="0 0 220 140"><path d="M10 120 Q70 10 130 60 T 210 20" fill="none" stroke="var(--dim)" stroke-width="2"/><line x1="30" y1="100" x2="190" y2="34" stroke="var(--amber-bright)" stroke-width="2"/><circle cx="110" cy="67" r="4.5" fill="var(--amber-bright)"/></svg>`,
+    'Integration': `<svg viewBox="0 0 220 140"><path d="M15 115 Q70 15 205 55 L205 118 L15 118 Z" fill="var(--amber)" fill-opacity="0.18" stroke="none"/><path d="M15 115 Q70 15 205 55" fill="none" stroke="var(--dim)" stroke-width="2"/><line x1="15" y1="20" x2="15" y2="118" stroke="var(--dim)" stroke-width="1"/><line x1="15" y1="118" x2="215" y2="118" stroke="var(--dim)" stroke-width="1"/><line x1="60" y1="118" x2="60" y2="91" stroke="var(--amber-bright)" stroke-width="1.5" stroke-dasharray="3 3"/><line x1="165" y1="118" x2="165" y2="60" stroke="var(--amber-bright)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>`,
+    'Related Rates': `<svg viewBox="0 0 220 140"><line x1="30" y1="120" x2="30" y2="15" stroke="var(--dim)" stroke-width="2"/><line x1="20" y1="120" x2="205" y2="120" stroke="var(--dim)" stroke-width="2"/><line x1="30" y1="35" x2="185" y2="120" stroke="var(--amber-bright)" stroke-width="2.5"/><path d="M30 55 A20 20 0 0 1 46 40" fill="none" stroke="var(--dim)" stroke-width="1.3"/><path d="M0 -6 L6 0 L0 6" transform="translate(30,25) rotate(-15)" fill="none" stroke="var(--amber-bright)" stroke-width="1.6"/><path d="M-6 -3 L0 4 L6 -3" transform="translate(200,120)" fill="none" stroke="var(--amber-bright)" stroke-width="1.6"/></svg>`,
+    'Proofs': `<svg viewBox="0 0 220 140"><g stroke="var(--dim)" stroke-width="1.6" fill="none"><rect x="20" y="70" width="12" height="45" transform="rotate(18 26 92)"/><rect x="60" y="75" width="12" height="45" transform="rotate(18 66 97)"/><rect x="100" y="80" width="12" height="45" transform="rotate(10 106 102)"/></g><g stroke="var(--amber-bright)" stroke-width="1.8" fill="none"><rect x="140" y="80" width="12" height="45"/><rect x="180" y="80" width="12" height="45"/></g><line x1="35" y1="120" x2="205" y2="120" stroke="var(--dim)" stroke-width="1.5"/></svg>`,
+    'Series': `<svg viewBox="0 0 220 140"><line x1="15" y1="120" x2="210" y2="120" stroke="var(--dim)" stroke-width="1"/><line x1="15" y1="120" x2="15" y2="15" stroke="var(--dim)" stroke-width="1"/><line x1="15" y1="35" x2="210" y2="35" stroke="var(--amber-bright)" stroke-width="1.3" stroke-dasharray="4 4"/><g fill="var(--amber)"><rect x="30" y="95" width="18" height="25"/><rect x="60" y="75" width="18" height="45"/><rect x="90" y="60" width="18" height="60"/><rect x="120" y="50" width="18" height="70"/><rect x="150" y="44" width="18" height="76"/><rect x="180" y="40" width="18" height="80"/></g></svg>`,
+    'Linear Algebra': `<svg viewBox="0 0 220 140"><g stroke="var(--dim)" stroke-width="1"><line x1="20" y1="20" x2="20" y2="120"/><line x1="60" y1="20" x2="60" y2="120"/><line x1="100" y1="20" x2="100" y2="120"/><line x1="20" y1="20" x2="100" y2="20"/><line x1="20" y1="70" x2="100" y2="70"/><line x1="20" y1="120" x2="100" y2="120"/></g><g stroke="var(--amber-bright)" stroke-width="1.8" fill="none"><path d="M130 30 L210 30 L230 70 L150 70 Z" opacity="0"/><line x1="130" y1="120" x2="200" y2="120"/><line x1="150" y1="30" x2="220" y2="30"/><line x1="130" y1="120" x2="150" y2="30"/><line x1="200" y1="120" x2="220" y2="30"/></g><path d="M105 70 L120 70" stroke="var(--amber)" stroke-width="1.3" marker-end="url(#exArrow)"/></svg>`,
+    'Probability': `<svg viewBox="0 0 220 140"><line x1="15" y1="120" x2="210" y2="120" stroke="var(--dim)" stroke-width="1"/><path d="M15 118 C 55 118 70 25 112 25 C 155 25 170 118 210 118" fill="none" stroke="var(--dim)" stroke-width="2"/><path d="M75 118 C 90 90 100 35 112 25 C 124 35 134 90 150 118 Z" fill="var(--amber)" fill-opacity="0.22" stroke="none"/></svg>`,
+    'General': `<svg viewBox="0 0 220 140"><line x1="15" y1="70" x2="210" y2="70" stroke="var(--dim)" stroke-width="1.4"/><g fill="var(--amber-bright)"><circle cx="40" cy="70" r="3.5"/><circle cx="90" cy="70" r="3.5"/><circle cx="150" cy="70" r="3.5"/></g><path d="M100 40 C 140 40 140 100 180 100 M180 40 C 140 40 140 100 100 100" fill="none" stroke="var(--amber)" stroke-width="1.6" opacity="0.55"/></svg>`
+  };
+  const EXPLORE_TOPICS = ['Differentiation','Integration','Related Rates','Proofs','Series','Linear Algebra','Probability','General'];
+
+  let exploreFilter = 'All';
+  function exploreYourTopics(){
+    const set = new Set();
+    (store.chunks || []).forEach(c => { if(c.topic && c.topic !== 'General') set.add(c.topic); });
+    return set;
   }
-  document.getElementById('explore-next').addEventListener('click', renderExplore);
+  function renderExploreChips(yourTopics){
+    const counts = {};
+    EXPLORE_FACTS.forEach(f => { counts[f.topic] = (counts[f.topic] || 0) + 1; });
+    const chips = ['All', ...EXPLORE_TOPICS];
+    document.getElementById('explore-chips').innerHTML = chips.map(t => {
+      const n = t === 'All' ? EXPLORE_FACTS.length : (counts[t] || 0);
+      const dot = yourTopics.has(t) ? '<span style="color:var(--amber-bright);">\u25CF</span> ' : '';
+      return `<div class="explore-chip${t === exploreFilter ? ' active' : ''}" data-topic="${t}">${dot}${t.toUpperCase()}<span class="n">${n}</span></div>`;
+    }).join('');
+    document.getElementById('explore-chips').querySelectorAll('.explore-chip').forEach(el => {
+      el.addEventListener('click', () => { exploreFilter = el.dataset.topic; renderExplore(); });
+    });
+  }
+  function renderExplore(){
+    const yourTopics = exploreYourTopics();
+    renderExploreChips(yourTopics);
+    document.getElementById('explore-desc').textContent = yourTopics.size
+      ? 'Cards marked \u25CF match topics you\u2019ve actually uploaded material on.'
+      : 'Visual bites of the ideas behind your modules. Upload past papers to see this tailored to what you\u2019re studying.';
+    let list = EXPLORE_FACTS.map((f, idx) => ({ ...f, idx, mine: yourTopics.has(f.topic) }));
+    if(exploreFilter !== 'All') list = list.filter(f => f.topic === exploreFilter);
+    else list = list.slice().sort((a, b) => (b.mine - a.mine) || (a.idx - b.idx));
+    const grid = document.getElementById('explore-grid');
+    if(!list.length){ grid.innerHTML = '<div class="explore-empty">Nothing here yet.</div>'; return; }
+    grid.innerHTML = list.map(f => `
+      <div class="explore-card${f.mine ? ' is-yours' : ''}">
+        <div class="explore-viz">${EXPLORE_VIZ[f.topic] || EXPLORE_VIZ['General']}</div>
+        <div class="explore-body">
+          <div class="explore-eyebrow"><span>${f.topic.toUpperCase()}</span>${f.mine ? '<span class="yours-tag">IN YOUR UPLOADS</span>' : ''}</div>
+        </div>`).join('');
+  }
+
+  // ============ LIVE ============
+  // A break tab, deliberately unrelated to the maths content. Left side is a
+  // real live feed from the Hacker News Algolia search API (free, keyless,
+  // genuinely live — no invented headlines). Right side is YouTube search,
+  // which needs your own YOUTUBE_API_KEY on the backend; without it this
+  // panel says so plainly rather than faking results.
+  const LIVE_DEFAULT_INTERESTS = ['machine learning', 'deep learning', 'artificial intelligence', 'Hugging Face', 'SpaceX Mars'];
+  const LIVE_ACCENTS = ['#d99a2b', '#7fae6a', '#5c9ecf', '#b3492f', '#a879c9', '#c9a24a', '#4aa7a2'];
+  function liveAccentFor(tag){
+    let h = 0; for(let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    return LIVE_ACCENTS[h % LIVE_ACCENTS.length];
+  }
+  function liveGetInterests(){
+    try{
+      const raw = localStorage.getItem('lm_live_interests');
+      if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr; }
+    }catch(e){}
+    return LIVE_DEFAULT_INTERESTS.slice();
+  }
+  function liveSetInterests(arr){
+    try{ localStorage.setItem('lm_live_interests', JSON.stringify(arr)); }catch(e){}
+  }
+  function liveTimeAgo(unixSeconds){
+    const s = Math.max(1, Math.floor(Date.now()/1000) - unixSeconds);
+    if(s < 3600) return Math.floor(s/60) + 'm ago';
+    if(s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+  }
+  function liveDomain(url){
+    try{ return new URL(url).hostname.replace(/^www\./, ''); }catch(e){ return ''; }
+  }
+  function renderLiveInterests(){
+    const interests = liveGetInterests();
+    const wrap = document.getElementById('live-interests');
+    wrap.innerHTML = interests.map((it, i) => `<div class="live-chip" style="border-color:${liveAccentFor(it)};color:${liveAccentFor(it)};">${escapeHtml(it)}<span class="x" data-i="${i}">✕</span></div>`).join('')
+      + '<div class="live-add"><input id="live-add-input" placeholder="+ add interest…" maxlength="40"></div>'
+      + '<span id="live-reset" style="font-size:10.5px;color:var(--dim);cursor:pointer;text-decoration:underline;margin-left:4px;">reset to defaults</span>';
+    wrap.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => {
+      const arr = liveGetInterests(); arr.splice(Number(x.dataset.i), 1);
+      liveSetInterests(arr); renderLiveInterests(); liveFetchFeed(); liveFetchVideos();
+    }));
+    document.getElementById('live-reset').addEventListener('click', () => {
+      liveSetInterests(LIVE_DEFAULT_INTERESTS.slice()); renderLiveInterests(); liveFetchFeed(); liveFetchVideos();
+    });
+    const input = document.getElementById('live-add-input');
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && input.value.trim()){
+        const arr = liveGetInterests(); arr.push(input.value.trim());
+        liveSetInterests(arr); renderLiveInterests(); liveFetchFeed(); liveFetchVideos();
+      }
+    });
+  }
+  async function liveFetchFeed(){
+    const feed = document.getElementById('live-feed');
+    feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Loading live results from Hacker News…</div></div>';
+    const interests = liveGetInterests();
+    if(!interests.length){ feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Add an interest above to get a feed.</div></div>'; return; }
+    try{
+      const batches = await Promise.all(interests.map(async q => {
+        try{
+          const r = await fetch('https://hn.algolia.com/api/v1/search?tags=story&hitsPerPage=8&query=' + encodeURIComponent(q));
+          if(!r.ok) return [];
+          const d = await r.json();
+          return (d.hits || []).map(h => ({
+            title: h.title, url: h.url || ('https://news.ycombinator.com/item?id=' + h.objectID),
+            points: h.points || 0, comments: h.num_comments || 0, created: h.created_at_i, id: h.objectID, q
+          }));
+        }catch(e){ return []; }
+      }));
+      const seen = new Set();
+      let items = [];
+      batches.forEach(b => b.forEach(it => { if(!seen.has(it.id)){ seen.add(it.id); items.push(it); } }));
+      items.sort((a, b) => b.created - a.created);
+      items = items.slice(0, 40);
+      if(!items.length){ feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">No recent Hacker News results for these interests right now. Try different terms.</div></div>'; return; }
+      feed.innerHTML = items.map(it => {
+        const domain = liveDomain(it.url);
+        const accent = liveAccentFor(it.q);
+        return `
+        <div class="live-card" style="--live-accent:${accent};">
+          <div class="live-card-src">
+            ${domain ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <span class="lv-domain">${escapeHtml(domain || 'news.ycombinator.com')}</span>
+            <span class="lv-tag">${escapeHtml(it.q)}</span>
+            <span class="lv-time">${liveTimeAgo(it.created)}</span>
+          </div>
+          <div class="live-card-title"><a href="${it.url}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a></div>
+          <div class="live-card-meta"><span>▲ ${it.points} points</span><span>💬 ${it.comments} comments</span></div>
+        </div>`;
+      }).join('');
+    }catch(e){
+      feed.innerHTML = '<div class="live-card"><div class="live-card-title" style="color:var(--dim);">Couldn\'t load the live feed: ' + escapeHtml(e.message || String(e)) + '</div></div>';
+    }
+  }
+  // Per-query pagination state for the video feed. YouTube pages results one
+  // query at a time, so we track a nextPageToken per interest and stop
+  // asking a given interest once it runs out.
+  let liveVideoSeen = new Set();
+  let liveVideoTokens = {};
+  let liveVideoExhausted = new Set();
+  let liveVideoLoadingMore = false;
+  let liveVideoScrollWired = false;
+  const liveVideoDataById = new Map();
+  let liveVideoObserver = null;
+
+  function lvThumbHtml(v){
+    return `
+      <img src="${escapeHtml(v.thumbnail || '')}" alt="" loading="lazy">
+      <div class="lv-play">▶</div>
+      <div class="lv-vtitle">${escapeHtml(v.title)}<br><span style="opacity:.75;">${escapeHtml(v.channel || '')}</span></div>`;
+  }
+  function lvIframeHtml(v){
+    return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.videoId)}?autoplay=1&mute=1&playsinline=1&rel=0" title="${escapeHtml(v.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }
+  // One full-screen slide per video — TikTok-style: scroll snaps to the
+  // next one, and whichever slide is actually on screen autoplays (muted;
+  // tap the player to unmute) while the rest sit as thumbnails.
+  function liveVideoSlideEl(v){
+    liveVideoDataById.set(v.videoId, v);
+    const el = document.createElement('div');
+    el.className = 'live-video-slide';
+    el.dataset.videoId = v.videoId;
+    el.innerHTML = `<div class="lv-frame">${lvThumbHtml(v)}</div>`;
+    if(liveVideoObserver) liveVideoObserver.observe(el);
+    return el;
+  }
+  function liveVideoSetupObserver(feedEl){
+    if(liveVideoObserver) liveVideoObserver.disconnect();
+    liveVideoObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        const frame = entry.target.querySelector('.lv-frame');
+        const v = liveVideoDataById.get(entry.target.dataset.videoId);
+        if(!frame || !v) return;
+        const isPlaying = !!frame.querySelector('iframe');
+        if(entry.isIntersecting && entry.intersectionRatio >= 0.75){
+          if(!isPlaying) frame.innerHTML = lvIframeHtml(v);
+        } else if(isPlaying){
+          frame.innerHTML = lvThumbHtml(v); // scrolled away — stop playing it
+        }
+      });
+    }, { root: feedEl, threshold: [0, 0.75, 1] });
+  }
+  // Trickles slides into the feed one at a time instead of the whole batch
+  // landing at once — same infinite feed, just a smoother, continuous flow.
+  function appendTilesStaggered(feedEl, vids, delay){
+    delay = delay || 90;
+    return new Promise(resolve => {
+      if(!vids.length){ resolve(); return; }
+      let i = 0;
+      (function next(){
+        if(i >= vids.length){ resolve(); return; }
+        const v = vids[i++];
+        if(document.body.contains(feedEl)){
+          liveVideoSeen.add(v.videoId);
+          feedEl.appendChild(liveVideoSlideEl(v));
+        }
+        setTimeout(next, delay);
+      })();
+    });
+  }
+  async function liveVideoRequest(interests, pageTokens){
+    const r = await fetch('/api/lm-feed-videos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interests, pageTokens })
+    });
+    const data = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(data.error || ('request failed (' + r.status + ')'));
+    return data;
+  }
+  async function liveFetchVideos(){
+    const wrap = document.getElementById('live-videos');
+    liveVideoSetupObserver(wrap);
+    wrap.innerHTML = '<div class="live-empty-note">Loading videos…</div>';
+    liveVideoSeen = new Set(); liveVideoTokens = {}; liveVideoExhausted = new Set(); liveVideoLoadingMore = false;
+    const interests = liveGetInterests();
+    if(!interests.length){ wrap.innerHTML = '<div class="live-empty-note">Add an interest above to get videos.</div>'; return; }
+    try{
+      const data = await liveVideoRequest(interests, {});
+      if(data.notConfigured){
+        wrap.innerHTML = '<div class="live-empty-note">Video results need a YouTube Data API key. Add <code>YOUTUBE_API_KEY</code> to your Vercel project\'s environment variables, then deploy <code>api/lm-feed-videos.js</code>, to turn this on.</div>';
+        return;
+      }
+      const vids = data.videos || [];
+      liveVideoTokens = data.nextPageTokens || {};
+      interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
+      if(!vids.length){ wrap.innerHTML = '<div class="live-empty-note">No videos found for these interests right now.</div>'; return; }
+      // Nothing plays until its slide is actually on screen, so we're not
+      // running a dozen YouTube players at once. Slides trickle in one at
+      // a time rather than the whole batch appearing together.
+      wrap.innerHTML = '';
+      await appendTilesStaggered(wrap, vids);
+      if(!liveVideoScrollWired){
+        liveVideoScrollWired = true;
+        wrap.addEventListener('scroll', () => {
+          if(liveVideoLoadingMore) return;
+          if(wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 800) liveLoadMoreVideos();
+        });
+      }
+    }catch(e){
+      wrap.innerHTML = '<div class="live-empty-note">Video backend not reachable: ' + escapeHtml(e.message || String(e)) + '. Deploy <code>api/lm-feed-videos.js</code> with a <code>YOUTUBE_API_KEY</code> set, or open this page on claude.ai.</div>';
+    }
+  }
+  async function liveLoadMoreVideos(){
+    const wrap = document.getElementById('live-videos');
+    if(!wrap) return;
+    const interests = liveGetInterests().filter(q => !liveVideoExhausted.has(q));
+    if(!interests.length){
+      if(!wrap.querySelector('.lv-end-note')){
+        const note = document.createElement('div');
+        note.className = 'live-empty-note lv-end-note';
+        note.textContent = "That's everything for these interests right now — add another interest for more.";
+        wrap.appendChild(note);
+      }
+      return;
+    }
+    liveVideoLoadingMore = true;
+    const loading = document.createElement('div');
+    loading.className = 'live-empty-note';
+    loading.textContent = 'Loading more…';
+    wrap.appendChild(loading);
+    try{
+      const pageTokens = {};
+      interests.forEach(q => { if(liveVideoTokens[q]) pageTokens[q] = liveVideoTokens[q]; });
+      const data = await liveVideoRequest(interests, pageTokens);
+      loading.remove();
+      if(data.notConfigured){ liveVideoExhausted = new Set(liveGetInterests()); return; }
+      liveVideoTokens = Object.assign({}, liveVideoTokens, data.nextPageTokens || {});
+      interests.forEach(q => { if(!liveVideoTokens[q]) liveVideoExhausted.add(q); });
+      const fresh = (data.videos || []).filter(v => !liveVideoSeen.has(v.videoId));
+      await appendTilesStaggered(wrap, fresh);
+    }catch(e){
+      loading.textContent = 'Could not load more: ' + (e.message || e);
+    }finally{
+      liveVideoLoadingMore = false;
+    }
+  }
+  let liveWired = false;
+  function renderLive(){
+    renderLiveInterests();
+    liveFetchFeed();
+    liveFetchVideos();
+    if(!liveWired){
+      liveWired = true;
+      const feed = document.getElementById('live-feed');
+      document.getElementById('live-up').addEventListener('click', () => feed.scrollBy({ top: -feed.clientHeight, behavior: 'smooth' }));
+      document.getElementById('live-down').addEventListener('click', () => feed.scrollBy({ top: feed.clientHeight, behavior: 'smooth' }));
+      document.getElementById('live-refresh').addEventListener('click', () => { liveFetchFeed(); liveFetchVideos(); });
+      const videoFeed = document.getElementById('live-videos');
+      document.getElementById('live-video-up').addEventListener('click', () => videoFeed.scrollBy({ top: -videoFeed.clientHeight, behavior: 'smooth' }));
+      document.getElementById('live-video-down').addEventListener('click', () => videoFeed.scrollBy({ top: videoFeed.clientHeight, behavior: 'smooth' }));
+      feed.addEventListener('keydown', e => {
+        if(e.key === 'ArrowDown'){ e.preventDefault(); feed.scrollBy({ top: feed.clientHeight, behavior: 'smooth' }); }
+        if(e.key === 'ArrowUp'){ e.preventDefault(); feed.scrollBy({ top: -feed.clientHeight, behavior: 'smooth' }); }
+      });
+      feed.tabIndex = 0;
+    }
+  }
 
   // ============ PROGRESS ============
   function renderProgress(){
